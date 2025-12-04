@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1">
+    <style>
+        .policy-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 40px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+        h1 { text-align: left; margin-bottom: 10px; }
+        h3 { margin-top: 25px; margin-bottom: 10px; color: var(--primary); }
+        p, li { color: var(--text-main); line-height: 1.6; margin-bottom: 10px; }
+        ul { margin-left: 20px; margin-bottom: 15px; }
+        .date { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 30px; display: block; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: var(--text-muted); text-decoration: none; font-weight: 500; }
+        .back-link:hover { color: var(--primary); }
+    </style>
+</head>
+<body>
+    
+    <div class="policy-container">
+        <a href="/" class="back-link">← Back to Vault</a>
+        
+        <h1>Privacy Policy</h1>
+        <span class="date">Last Updated: December 2025</span>
+
+        <p>Your privacy is not just important to us—it is the core function of this application. This policy outlines how we handle your data.</p>
+
+        <h3>1. Data We Collect</h3>
+        <p>We collect the minimum amount of data required to operate the service:</p>
+        <ul>
+            <li><strong>Account Information:</strong> A username and a salted hash of your master password.</li>
+            <li><strong>Vault Data:</strong> The site names, usernames, and passwords you explicitly save.</li>
+            <li><strong>Security Data:</strong> A 2FA secret key used to generate time-based codes.</li>
+        </ul>
+
+        <h3>2. How We Store Data (Encryption)</h3>
+        <p>Security is our priority. Your data is protected using industry-standard cryptography:</p>
+        <ul>
+            <li><strong>Zero-Knowledge Architecture:</strong> Your passwords are encrypted using <code>AES-256</code>.</li>
+            <li><strong>Encryption Keys:</strong> The key used to encrypt your data is derived from your Master Password. We do not store your Master Password. This means <strong>we physically cannot read your passwords</strong> even if we wanted to.</li>
+        </ul>
+
+        <h3>3. Cookies</h3>
+        <p>We use a single, strictly necessary cookie (<code>token</code>) to maintain your secure session after you log in. We do not use tracking cookies, analytics pixels, or advertising cookies.</p>
+
+        <h3>4. Data Sharing</h3>
+        <p>We do not sell, trade, or otherwise transfer your data to outside parties. Your vault data stays on our encrypted servers and is only delivered to you upon successful authentication.</p>
+
+        <h3>5. Your Rights</h3>
+        <p>You have the right to request the deletion of your account and all associated data at any time. Since we cannot recover your data without your Master Password, if you lose your Master Password, your data is permanently lost.</p>
+
+        <h3>6. Contact</h3>
+        <p>If you have questions about this policy, please email support at: <a href="#" id="contact-link">Loading...</a></p>
+
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid var(--border);">
+        <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center;">
+            This application is an open-source educational project. Use at your own risk.
+        </p>
+    </div>
+
+    <script>
+        // SPAM BOT PROTECTION
+        // We construct the email in reverse so simple scrapers can't read it.
+        document.addEventListener("DOMContentLoaded", function() {
+            // Updated to your new email address
+            const user = "appcontactpwvault"; 
+            const domain = "gmail.com"; 
+            
+            const link = document.getElementById('contact-link');
+            const email = user + '@' + domain;
+            
+            link.innerText = email;
+            link.href = "mailto:" + email;
+        });
+    </script>
+
+</body>
+</html>

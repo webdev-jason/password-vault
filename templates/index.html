@@ -3,86 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vault</title>
-    <!-- Link to our new Design System -->
-    <!-- We add ?v=1 to force the browser to reload the CSS if you change it later -->
+    <title>Password Vault</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1">
+    <style>
+        .edit-mode-inputs { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+        .edit-mode-inputs input { padding: 8px; font-size: 0.9rem; }
+        .footer { text-align: center; margin-top: 30px; font-size: 0.8rem; color: var(--text-muted); }
+        .footer a { color: var(--text-muted); text-decoration: none; }
+        .footer a:hover { color: var(--primary); text-decoration: underline; }
+    </style>
 </head>
 <body>
 
     <div class="app-container">
         
-        <!-- SECTION: LOGIN -->
         <div id="login-section" class="card">
             <h2>🔐 Secure Vault</h2>
             <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem;">Enter credentials to unlock</p>
-            
             <div class="input-group">
                 <label>Username</label>
                 <input type="text" id="login-user" autocomplete="off">
             </div>
-            
             <div class="input-group">
                 <label>Master Password</label>
                 <input type="password" id="login-pass">
             </div>
-            
             <div class="input-group">
                 <label>2FA Code</label>
                 <input type="text" id="login-code" placeholder="000 000" maxlength="6" style="text-align: center; letter-spacing: 2px;">
             </div>
-
             <button class="btn btn-primary" onclick="attemptLogin()">Unlock Vault</button>
             <div id="error-msg" class="text-error"></div>
         </div>
 
-        <!-- SECTION: DASHBOARD -->
         <div id="vault-section" class="hidden">
-            
-            <!-- Header -->
             <div class="header-row">
                 <h2>My Passwords</h2>
                 <a href="#" onclick="logout()" class="logout-link">Log Out</a>
             </div>
 
-            <!-- Add New Password Card -->
             <div class="card">
-                <div class="input-group">
-                    <input type="text" id="new-site" placeholder="Website (e.g. Netflix)">
-                </div>
-                <div class="input-group">
-                    <input type="text" id="new-user" placeholder="Username / Email">
-                </div>
+                <div class="input-group"><input type="text" id="new-site" placeholder="Website (e.g. Netflix)"></div>
+                <div class="input-group"><input type="text" id="new-user" placeholder="Username / Email"></div>
                 <div class="input-group" style="display: flex;">
                     <input type="text" id="new-pass" placeholder="Password">
-                    <!-- SVG Icon for Dice -->
                     <button class="btn btn-generate" onclick="generateRandomPassword()" title="Generate Random">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                            <circle cx="16" cy="8" r="2"></circle>
-                            <circle cx="8" cy="16" r="2"></circle>
-                            <circle cx="8" cy="8" r="2"></circle>
-                            <circle cx="16" cy="16" r="2"></circle>
-                            <circle cx="12" cy="12" r="2"></circle>
-                        </svg>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><circle cx="16" cy="8" r="2"></circle><circle cx="8" cy="16" r="2"></circle><circle cx="8" cy="8" r="2"></circle><circle cx="16" cy="16" r="2"></circle><circle cx="12" cy="12" r="2"></circle></svg>
                     </button>
                 </div>
                 <button class="btn btn-primary" onclick="addPassword()">Save Password</button>
             </div>
 
-            <!-- List Area -->
-            <div id="password-list">
-                <!-- Javascript will populate this -->
-            </div>
+            <div id="password-list"></div>
         </div>
 
+        <div class="footer">
+            <a href="/privacy" target="_blank">Privacy Policy</a>
+            <span style="margin: 0 5px;">•</span>
+            <span>Password Vault © 2025</span>
+        </div>
     </div>
 
     <script>
-        let sessionToken = ""; 
-        let masterKeyCache = ""; 
+        window.onload = async function() {
+            const savedKey = sessionStorage.getItem('masterKey');
+            if (savedKey) {
+                try {
+                    const response = await fetch('/api/check_session');
+                    if (response.ok) showVault(savedKey);
+                    else sessionStorage.removeItem('masterKey');
+                } catch(e) { console.log("Server unreachable"); }
+            }
+        };
 
-        /* --- 1. UTILITIES --- */
+        /* --- UTILITIES --- */
         function generateRandomPassword() {
             const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
             let password = "";
@@ -95,23 +89,26 @@
         }
 
         function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                // Visual feedback could go here
-                alert("Copied to clipboard!");
-            });
+            navigator.clipboard.writeText(text).then(() => alert("Copied!"));
         }
 
-        function logout() {
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST' });
+            sessionStorage.removeItem('masterKey');
             location.reload();
         }
 
-        /* --- 2. API CALLS --- */
+        function showVault(masterKey) {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('vault-section').classList.remove('hidden');
+            loadPasswords(masterKey);
+        }
+
+        /* --- API CALLS --- */
         async function attemptLogin() {
             const user = document.getElementById('login-user').value;
             const pass = document.getElementById('login-pass').value;
             const code = document.getElementById('login-code').value;
-
-            // Simple UI loading state could go here
             const btn = document.querySelector('#login-section .btn');
             btn.innerText = "Verifying...";
             
@@ -123,31 +120,22 @@
                 });
 
                 const result = await response.json();
-
                 if (response.ok) {
-                    sessionToken = result.token;
-                    masterKeyCache = pass;
-                    document.getElementById('login-section').classList.add('hidden');
-                    document.getElementById('vault-section').classList.remove('hidden');
-                    loadPasswords();
+                    sessionStorage.setItem('masterKey', pass);
+                    showVault(pass);
                 } else {
                     document.getElementById('error-msg').innerText = result.error || "Login Failed";
-                    btn.innerText = "Unlock Vault";
                 }
             } catch (e) {
                 document.getElementById('error-msg').innerText = "Server Error";
-                btn.innerText = "Unlock Vault";
-            }
+            } finally { btn.innerText = "Unlock Vault"; }
         }
 
-        async function loadPasswords() {
+        async function loadPasswords(masterKey) {
             const response = await fetch('/api/get_passwords', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-access-token': sessionToken 
-                },
-                body: JSON.stringify({ master_password: masterKeyCache })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ master_password: masterKey })
             });
             
             if (response.status === 401) return logout();
@@ -159,43 +147,92 @@
             passwords.forEach(p => {
                 const item = document.createElement('div');
                 item.className = 'vault-item';
+                item.id = `row-${p.id}`;
                 
-                // We use SVG icons for the buttons now
                 item.innerHTML = `
-                    <div class="vault-info">
-                        <span class="vault-site">${p.site}</span>
-                        <span class="vault-user">${p.username}</span>
+                    <div id="display-${p.id}" style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                        <div class="vault-info">
+                            <span class="vault-site">${p.site}</span>
+                            <span class="vault-user">${p.username}</span>
+                        </div>
+                        <div class="vault-actions">
+                            <button class="btn-icon" onclick="copyToClipboard('${p.password}')" title="Copy">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                            <button class="btn-icon" onclick="toggleEdit(${p.id})" title="Edit" style="color: var(--primary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
+                            <button class="btn-icon" onclick="deletePassword(${p.id})" title="Delete" style="color: var(--danger);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                        </div>
                     </div>
-                    <div class="vault-actions">
-                        <button class="btn-icon" onclick="copyToClipboard('${p.password}')" title="Copy Password">
-                            <!-- Copy Icon -->
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                        </button>
-                        <button class="btn-icon" onclick="deletePassword(${p.id})" title="Delete" style="color: var(--danger);">
-                            <!-- Trash Icon -->
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        </button>
+
+                    <div id="edit-${p.id}" class="edit-mode-inputs hidden">
+                        <input type="text" id="edit-site-${p.id}" value="${p.site}">
+                        <input type="text" id="edit-user-${p.id}" value="${p.username}">
+                        <input type="text" id="edit-pass-${p.id}" value="${p.password}">
+                        <div style="display:flex; gap:10px; margin-top:5px;">
+                            <button class="btn btn-primary" onclick="saveEdit(${p.id})" style="padding: 5px;">Save</button>
+                            <button class="btn btn-danger" onclick="toggleEdit(${p.id})" style="padding: 5px; color: var(--text-main);">Cancel</button>
+                        </div>
                     </div>
                 `;
                 listDiv.appendChild(item);
             });
         }
 
+        function toggleEdit(id) {
+            const displayRow = document.getElementById(`display-${id}`);
+            const editRow = document.getElementById(`edit-${id}`);
+            
+            if (displayRow.classList.contains('hidden')) {
+                displayRow.classList.remove('hidden');
+                editRow.classList.add('hidden');
+            } else {
+                displayRow.classList.add('hidden');
+                editRow.classList.remove('hidden');
+            }
+        }
+
+        async function saveEdit(id) {
+            const site = document.getElementById(`edit-site-${id}`).value;
+            const user = document.getElementById(`edit-user-${id}`).value;
+            const pass = document.getElementById(`edit-pass-${id}`).value;
+            const masterKey = sessionStorage.getItem('masterKey');
+
+            const response = await fetch('/api/update_password', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    id: id,
+                    master_password: masterKey,
+                    site_name: site,
+                    site_username: user,
+                    site_password: pass
+                })
+            });
+
+            if (response.ok) {
+                loadPasswords(masterKey); 
+            } else {
+                alert("Failed to update");
+            }
+        }
+
         async function addPassword() {
             const site = document.getElementById('new-site').value;
             const user = document.getElementById('new-user').value;
             const pass = document.getElementById('new-pass').value;
+            const masterKey = sessionStorage.getItem('masterKey');
 
             if(!site || !pass) return alert("Site and Password are required");
 
             const response = await fetch('/api/add_password', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-access-token': sessionToken
-                },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    master_password: masterKeyCache,
+                    master_password: masterKey,
                     site_name: site,
                     site_username: user,
                     site_password: pass
@@ -206,23 +243,19 @@
                 document.getElementById('new-site').value = "";
                 document.getElementById('new-user').value = "";
                 document.getElementById('new-pass').value = "";
-                loadPasswords();
+                loadPasswords(masterKey);
             }
         }
 
         async function deletePassword(id) {
-            if(!confirm("Are you sure you want to delete this?")) return;
-
+            if(!confirm("Are you sure?")) return;
+            const masterKey = sessionStorage.getItem('masterKey');
             const response = await fetch('/api/delete_password', {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-access-token': sessionToken
-                },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ id: id })
             });
-
-            if(response.ok) loadPasswords();
+            if(response.ok) loadPasswords(masterKey);
         }
     </script>
 </body>

@@ -87,7 +87,8 @@ input {
     font-size: 1rem;
     transition: border-color 0.2s, box-shadow 0.2s;
     outline: none;
-    -webkit-appearance: none; /* Removes default iOS styles */
+    -webkit-appearance: none; /* iOS Safari */
+    appearance: none;         /* Standard */
 }
 
 input:focus {
@@ -134,7 +135,7 @@ input:focus {
     color: var(--text-muted);
     padding: 8px;
     border-radius: 50%;
-    transition: background 0.2s, color 0.2s;
+    transition: background-color 0.2s, color 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -200,7 +201,7 @@ input:focus {
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    flex-shrink: 0; /* Prevents buttons from squishing */
+    flex-shrink: 0; 
 }
 
 /* 9. UTILITIES */
@@ -211,53 +212,18 @@ input:focus {
 .logout-link:hover { color: var(--danger); }
 
 /* 10. RESPONSIVE OPTIMIZATIONS */
-
-/* Standard Mobile */
 @media (max-width: 480px) {
     body { padding: 10px; }
     .card { padding: 1.5rem; }
 }
 
-/* Ultra-Small (Watches, Old Phones, Split View) */
 @media (max-width: 340px) {
     body { padding: 5px; }
-    
-    .card { 
-        padding: 1rem; 
-        border-radius: 8px;
-    }
-    
+    .card { padding: 1rem; border-radius: 8px; }
     h2 { font-size: 1.25rem; }
-    
-    /* Make the Password + Dice row wrap so it doesn't squish */
-    .input-group[style*="display: flex"] {
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-    
-    /* Input takes full width */
-    #new-pass { 
-        width: 100%; 
-        margin-bottom: 0;
-    }
-    
-    /* Button takes full width */
-    .btn-generate { 
-        margin-left: 0; 
-        width: 100%; 
-        padding: 10px;
-    }
-    
-    /* Stack list items if really narrow */
-    .vault-item {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .vault-actions {
-        width: 100%;
-        justify-content: flex-end;
-        margin-top: 10px;
-        border-top: 1px solid var(--border);
-        padding-top: 5px;
-    }
+    .input-group[style*="display: flex"] { flex-wrap: wrap; gap: 8px; }
+    #new-pass { width: 100%; margin-bottom: 0; }
+    .btn-generate { margin-left: 0; width: 100%; padding: 10px; }
+    .vault-item { flex-direction: column; align-items: flex-start; }
+    .vault-actions { width: 100%; justify-content: flex-end; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 5px; }
 }

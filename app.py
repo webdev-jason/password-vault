@@ -1,43 +1,39 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, make_response
 import sqlite3
 import pyotp
 import crypto_manager
 import jwt 
 import datetime
+import os
 from functools import wraps
 
 app = Flask(__name__)
-
-# CONFIGURATION
-# In a real production app, this key would be hidden in an environment variable, not code.
+# In production, this must be a random string hidden in environment variables
 app.config['SECRET_KEY'] = 'super_secret_enterprise_key_change_this_in_prod'
 
-# UTILITY: Database Connection
 def get_db_connection():
-    conn = sqlite3.connect('vault.db')
+    # We use absolute path to ensure we always find the DB, even on servers
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    db_path = os.path.join(basedir, 'vault.db')
+    
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row 
     return conn
 
-# UTILITY: The "Bouncer" (Decorator)
+# UTILITY: The "Bouncer" (Checks Cookies)
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
-        
-        # 1. Look for token in headers
-        if 'x-access-token' in request.headers:
-            token = request.headers['x-access-token']
+        if 'token' in request.cookies:
+            token = request.cookies.get('token')
         
         if not token:
-            return jsonify({'message': 'Token is missing! Authentication required.'}), 401
+            return jsonify({'message': 'Token is missing!'}), 401
         
         try:
-            # 2. Decode the token (Verification)
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             current_user_id = data['user_id']
-            
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired! Please login again.'}), 401
         except Exception:
             return jsonify({'message': 'Token is invalid!'}), 401
             
@@ -45,7 +41,6 @@ def token_required(f):
     
     return decorated
 
-# UTILITY: Auth Helper (Password Check Only)
 def verify_password_logic(user_id, master_password):
     conn = get_db_connection()
     user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
@@ -64,6 +59,10 @@ def verify_password_logic(user_id, master_password):
 def index():
     return render_template('index.html')
 
+@app.route('/privacy')
+def privacy():
+    return render_template('privacy.html')
+
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
@@ -71,30 +70,42 @@ def login():
     password_input = data.get('password')
     code_input = data.get('2fa_code')
 
-    # 1. Find User
     conn = get_db_connection()
     user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
     conn.close()
 
-    if not user:
-        return jsonify({"error": "User not found"}), 404
+    if not user: return jsonify({"error": "User not found"}), 404
 
-    # 2. Verify Password (HASH)
+    # Verify Password & 2FA
     if not crypto_manager.verify_master_password(password_input, user['salt'], user['password_hash']):
         return jsonify({"error": "Invalid Password"}), 401
-
-    # 3. Verify 2FA (TIME)
+    
     totp = pyotp.TOTP(user['two_factor_secret'])
     if not totp.verify(code_input):
         return jsonify({"error": "Invalid 2FA Code"}), 401
 
-    # 4. GENERATE TOKEN (The "Badge")
+    # Generate Token
     token = jwt.encode({
         'user_id': user['id'],
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60)
     }, app.config['SECRET_KEY'], algorithm="HS256")
 
-    return jsonify({"token": token}), 200
+    # CREATE RESPONSE WITH COOKIE
+    resp = make_response(jsonify({"message": "Login Successful"}))
+    resp.set_cookie('token', token, httponly=True, samesite='Strict')
+    
+    return resp, 200
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    resp = make_response(jsonify({"message": "Logged out"}))
+    resp.set_cookie('token', '', expires=0)
+    return resp, 200
+
+@app.route('/api/check_session', methods=['GET'])
+@token_required
+def check_session(current_user_id):
+    return jsonify({"status": "valid", "user_id": current_user_id}), 200
 
 @app.route('/api/add_password', methods=['POST'])
 @token_required 
@@ -148,22 +159,51 @@ def get_all_passwords(current_user_id):
                 "password": decrypted_pw
             })
         except Exception:
-            # Enterprise Error Handling: Skip bad rows instead of crashing
-            print(f"Error decrypting row {row['id']}")
+            pass
 
     return jsonify(results), 200
+
+@app.route('/api/update_password', methods=['PUT'])
+@token_required
+def update_password_entry(current_user_id):
+    data = request.json
+    password_id = data.get('id')
+    master_password = data.get('master_password')
+    
+    user = verify_password_logic(current_user_id, master_password)
+    if not user:
+        return jsonify({"error": "Invalid Master Password"}), 401
+
+    salt_bytes = bytes.fromhex(user['salt'])
+    encryption_key = crypto_manager.derive_encryption_key(master_password, salt_bytes)
+    encrypted_pw = crypto_manager.encrypt_val(encryption_key, data.get('site_password'))
+
+    conn = get_db_connection()
+    conn.execute('''
+        UPDATE passwords 
+        SET site_name = ?, site_username = ?, encrypted_password = ?
+        WHERE id = ? AND user_id = ?
+    ''', (
+        data.get('site_name'), 
+        data.get('site_username'), 
+        encrypted_pw, 
+        password_id, 
+        current_user_id
+    ))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Updated successfully"}), 200
 
 @app.route('/api/delete_password', methods=['DELETE'])
 @token_required
 def delete_password_entry(current_user_id):
     data = request.json
     password_id = data.get('id')
-
     conn = get_db_connection()
     conn.execute('DELETE FROM passwords WHERE id = ? AND user_id = ?', (password_id, current_user_id))
     conn.commit()
     conn.close()
-
     return jsonify({"message": "Deleted successfully"}), 200
 
 if __name__ == '__main__':
