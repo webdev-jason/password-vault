@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Password Vault</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 400px; }
+        h2 { text-align: center; color: #333; }
+        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+        button:hover { background-color: #218838; }
+        .hidden { display: none; }
+        #error-msg { color: red; text-align: center; margin-top: 10px; }
+        
+        /* Vault Table Styles */
+        .vault-item { background: #eee; padding: 10px; margin-bottom: 5px; border-radius: 4px; word-break: break-all;}
+        .vault-item strong { color: #007bff; }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="login-section">
+        <h2>Vault Login</h2>
+        <input type="text" id="login-user" placeholder="Username">
+        <input type="password" id="login-pass" placeholder="Master Password">
+        <input type="text" id="login-code" placeholder="2FA Code (6-digit)">
+        <button onclick="attemptLogin()">Unlock Vault</button>
+        <div id="error-msg"></div>
+    </div>
+
+    <div class="container hidden" id="vault-section">
+        <h2>My Passwords</h2>
+        
+        <div style="border-bottom: 1px solid #ddd; padding-bottom: 15px; margin-bottom: 15px;">
+            <input type="text" id="new-site" placeholder="Site (e.g. Netflix)">
+            <input type="text" id="new-user" placeholder="Username/Email">
+            <input type="password" id="new-pass" placeholder="Password">
+            <button onclick="addPassword()">Save New Password</button>
+        </div>
+
+        <div id="password-list">
+            </div>
+    </div>
+
+    <script>
+        // We store credentials in memory so we can send them with requests
+        let currentUser = "";
+        let currentPass = "";
+
+        async function attemptLogin() {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            const code = document.getElementById('login-code').value;
+
+            // 1. Call the API
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username: user, password: pass, "2fa_code": code })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Success! Switch screens
+                currentUser = user;
+                currentPass = pass; // Store temporarily in JS memory
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('vault-section').classList.remove('hidden');
+                loadPasswords(); // Fetch data immediately
+            } else {
+                document.getElementById('error-msg').innerText = result.error;
+            }
+        }
+
+        async function loadPasswords() {
+            const response = await fetch('/api/get_passwords', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username: currentUser, master_password: currentPass })
+            });
+            
+            const passwords = await response.json();
+            const listDiv = document.getElementById('password-list');
+            listDiv.innerHTML = ""; // Clear list
+
+            passwords.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'vault-item';
+                item.innerHTML = `
+                    <strong>${p.site}</strong><br>
+                    User: ${p.username}<br>
+                    Pass: ${p.password}
+                `;
+                listDiv.appendChild(item);
+            });
+        }
+
+        async function addPassword() {
+            const site = document.getElementById('new-site').value;
+            const user = document.getElementById('new-user').value;
+            const pass = document.getElementById('new-pass').value;
+
+            const response = await fetch('/api/add_password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: currentUser,
+                    master_password: currentPass,
+                    site_name: site,
+                    site_username: user,
+                    site_password: pass
+                })
+            });
+
+            if (response.ok) {
+                alert("Saved!");
+                // Clear inputs
+                document.getElementById('new-site').value = "";
+                document.getElementById('new-user').value = "";
+                document.getElementById('new-pass').value = "";
+                // Refresh the list
+                loadPasswords();
+            }
+        }
+    </script>
+</body>
+</html>
