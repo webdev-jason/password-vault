@@ -1,0 +1,263 @@
+/* static/style.css */
+
+/* 1. DESIGN SYSTEM (Variables) */
+:root {
+    /* Color Palette - Modern Indigo Theme */
+    --primary: #4F46E5;       /* Main Action Color */
+    --primary-hover: #4338ca;
+    --background: #F3F4F6;    /* Light Grey Background */
+    --surface: #FFFFFF;       /* Card White */
+    --text-main: #111827;     /* Almost Black */
+    --text-muted: #6B7280;    /* Grey Text */
+    --border: #E5E7EB;        /* Subtle Borders */
+    --danger: #EF4444;        /* Red for Delete */
+    --success: #10B981;       /* Green for Success */
+
+    /* Spacing & Sizing */
+    --radius: 12px;           /* Rounded corners */
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* 2. GLOBAL RESET */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-stack);
+    background-color: var(--background);
+    color: var(--text-main);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+/* 3. LAYOUT CONTAINER */
+.app-container {
+    width: 100%;
+    max-width: 480px; 
+    background: transparent;
+}
+
+/* 4. TYPOGRAPHY */
+h1, h2 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    color: var(--text-main);
+}
+
+p { font-size: 0.95rem; }
+
+/* 5. COMPONENTS: CARDS */
+.card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border);
+}
+
+/* 6. COMPONENTS: INPUTS */
+.input-group {
+    margin-bottom: 1rem;
+}
+
+label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-main);
+    margin-bottom: 0.5rem;
+}
+
+input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+    -webkit-appearance: none; /* Removes default iOS styles */
+}
+
+input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* 7. COMPONENTS: BUTTONS */
+.btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 0.1s, background-color 0.2s;
+}
+
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+    background-color: var(--primary);
+    color: white;
+}
+.btn-primary:hover { background-color: var(--primary-hover); }
+
+.btn-danger {
+    background-color: transparent;
+    color: var(--danger);
+    font-size: 0.875rem;
+    width: auto;
+    padding: 0.5rem;
+}
+.btn-danger:hover { background-color: #FEF2F2; }
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 8px;
+    border-radius: 50%;
+    transition: background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-icon:hover {
+    background-color: var(--background);
+    color: var(--primary);
+}
+
+.btn-generate {
+    background-color: var(--background);
+    color: var(--text-main);
+    width: auto;
+    margin-left: 8px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.btn-generate:hover { background-color: #E5E7EB; }
+
+/* 8. PASSWORD LIST ITEMS */
+.vault-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: box-shadow 0.2s;
+}
+
+.vault-item:hover { box-shadow: var(--shadow); }
+
+.vault-info {
+    flex-grow: 1;
+    overflow: hidden;
+    margin-right: 10px;
+}
+
+.vault-site {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--text-main);
+    display: block;
+}
+
+.vault-user {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    display: block;
+}
+
+.vault-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0; /* Prevents buttons from squishing */
+}
+
+/* 9. UTILITIES */
+.hidden { display: none !important; }
+.text-error { color: var(--danger); text-align: center; margin-top: 1rem; font-size: 0.9rem; }
+.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.logout-link { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+.logout-link:hover { color: var(--danger); }
+
+/* 10. RESPONSIVE OPTIMIZATIONS */
+
+/* Standard Mobile */
+@media (max-width: 480px) {
+    body { padding: 10px; }
+    .card { padding: 1.5rem; }
+}
+
+/* Ultra-Small (Watches, Old Phones, Split View) */
+@media (max-width: 340px) {
+    body { padding: 5px; }
+    
+    .card { 
+        padding: 1rem; 
+        border-radius: 8px;
+    }
+    
+    h2 { font-size: 1.25rem; }
+    
+    /* Make the Password + Dice row wrap so it doesn't squish */
+    .input-group[style*="display: flex"] {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    /* Input takes full width */
+    #new-pass { 
+        width: 100%; 
+        margin-bottom: 0;
+    }
+    
+    /* Button takes full width */
+    .btn-generate { 
+        margin-left: 0; 
+        width: 100%; 
+        padding: 10px;
+    }
+    
+    /* Stack list items if really narrow */
+    .vault-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .vault-actions {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 10px;
+        border-top: 1px solid var(--border);
+        padding-top: 5px;
+    }
+}
