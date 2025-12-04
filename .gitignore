@@ -1,0 +1,9 @@
+# Ignore the virtual environment folder
+venv/
+__pycache__/
+
+# Ignore the database file (SECURITY CRITICAL)
+*.db
+
+# Ignore generic system files
+.DS_Store
