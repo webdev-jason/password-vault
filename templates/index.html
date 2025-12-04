@@ -2,21 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Password Vault</title>
+    <title>Enterprise Password Vault</title>
     <style>
-        body { font-family: sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 400px; }
-        h2 { text-align: center; color: #333; }
-        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
-        button:hover { background-color: #218838; }
-        .hidden { display: none; }
-        #error-msg { color: red; text-align: center; margin-top: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 450px; }
+        h2 { text-align: center; color: #1a1a1a; margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
         
-        /* Vault Table Styles */
-        .vault-item { background: #eee; padding: 10px; margin-bottom: 5px; border-radius: 4px; word-break: break-all;}
-        .vault-item strong { color: #007bff; }
+        /* Enterprise Button Styles */
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background 0.2s; margin-top: 10px; }
+        .btn-primary { background-color: #0056b3; color: white; }
+        .btn-primary:hover { background-color: #004494; }
+        .btn-danger { background-color: #dc3545; color: white; width: auto; flex: 1; }
+        .btn-secondary { background-color: #6c757d; color: white; width: auto; flex: 1; }
+        .btn-generate { background-color: #28a745; color: white; margin-top: 5px; }
+
+        .hidden { display: none; }
+        #error-msg { color: #dc3545; text-align: center; margin-top: 15px; font-weight: 500; }
+        
+        .vault-item { background: #fff; border: 1px solid #e1e4e8; padding: 15px; margin-bottom: 10px; border-radius: 8px; position: relative; }
+        .vault-item strong { display: block; font-size: 1.1em; margin-bottom: 4px; color: #0056b3; }
+        .action-buttons { display: flex; gap: 8px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -26,35 +32,50 @@
         <input type="text" id="login-user" placeholder="Username">
         <input type="password" id="login-pass" placeholder="Master Password">
         <input type="text" id="login-code" placeholder="2FA Code (6-digit)">
-        <button onclick="attemptLogin()">Unlock Vault</button>
+        <button class="btn btn-primary" onclick="attemptLogin()">Secure Login</button>
         <div id="error-msg"></div>
     </div>
 
     <div class="container hidden" id="vault-section">
-        <h2>My Passwords</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin:0;">My Vault</h2>
+            <button onclick="logout()" style="background:none; border:none; color: #666; cursor: pointer; text-decoration: underline;">Logout</button>
+        </div>
         
-        <div style="border-bottom: 1px solid #ddd; padding-bottom: 15px; margin-bottom: 15px;">
-            <input type="text" id="new-site" placeholder="Site (e.g. Netflix)">
-            <input type="text" id="new-user" placeholder="Username/Email">
-            <input type="password" id="new-pass" placeholder="Password">
-            <button onclick="addPassword()">Save New Password</button>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <input type="text" id="new-site" placeholder="Site Name">
+            <input type="text" id="new-user" placeholder="Username">
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="new-pass" placeholder="Password">
+                <button class="btn btn-generate" style="width: auto;" onclick="generateRandomPassword()">🎲</button>
+            </div>
+            <button class="btn btn-primary" onclick="addPassword()">Save Securely</button>
         </div>
 
-        <div id="password-list">
-            </div>
+        <div id="password-list"></div>
     </div>
 
     <script>
-        // We store credentials in memory so we can send them with requests
-        let currentUser = "";
-        let currentPass = "";
+        let sessionToken = ""; // STORES THE JWT
+        let masterKeyCache = ""; // Stores the password temporarily
+
+        // 1. GENERATE RANDOM PASSWORD
+        function generateRandomPassword() {
+            const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
+            let password = "";
+            for (let i = 0; i < 16; i++) {
+                const randomValues = new Uint32Array(1);
+                window.crypto.getRandomValues(randomValues);
+                password += chars[randomValues[0] % chars.length];
+            }
+            document.getElementById('new-pass').value = password;
+        }
 
         async function attemptLogin() {
             const user = document.getElementById('login-user').value;
             const pass = document.getElementById('login-pass').value;
             const code = document.getElementById('login-code').value;
 
-            // 1. Call the API
             const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -64,12 +85,13 @@
             const result = await response.json();
 
             if (response.ok) {
-                // Success! Switch screens
-                currentUser = user;
-                currentPass = pass; // Store temporarily in JS memory
+                // SAVE THE TOKEN
+                sessionToken = result.token;
+                masterKeyCache = pass;
+                
                 document.getElementById('login-section').classList.add('hidden');
                 document.getElementById('vault-section').classList.remove('hidden');
-                loadPasswords(); // Fetch data immediately
+                loadPasswords();
             } else {
                 document.getElementById('error-msg').innerText = result.error;
             }
@@ -78,21 +100,34 @@
         async function loadPasswords() {
             const response = await fetch('/api/get_passwords', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ username: currentUser, master_password: currentPass })
+                // ATTACH THE TOKEN TO THE HEADER
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-access-token': sessionToken 
+                },
+                body: JSON.stringify({ master_password: masterKeyCache })
             });
             
+            if (response.status === 401) {
+                alert("Session expired. Please login again.");
+                logout();
+                return;
+            }
+
             const passwords = await response.json();
             const listDiv = document.getElementById('password-list');
-            listDiv.innerHTML = ""; // Clear list
+            listDiv.innerHTML = ""; 
 
             passwords.forEach(p => {
                 const item = document.createElement('div');
                 item.className = 'vault-item';
                 item.innerHTML = `
-                    <strong>${p.site}</strong><br>
-                    User: ${p.username}<br>
-                    Pass: ${p.password}
+                    <strong>${p.site}</strong>
+                    <div style="font-size:0.9em; color:#555; margin-bottom:5px;">${p.username}</div>
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary" onclick="copyToClipboard('${p.password}')">Copy Pass</button>
+                        <button class="btn btn-danger" onclick="deletePassword(${p.id})">Delete</button>
+                    </div>
                 `;
                 listDiv.appendChild(item);
             });
@@ -105,10 +140,12 @@
 
             const response = await fetch('/api/add_password', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-access-token': sessionToken
+                },
                 body: JSON.stringify({
-                    username: currentUser,
-                    master_password: currentPass,
+                    master_password: masterKeyCache,
                     site_name: site,
                     site_username: user,
                     site_password: pass
@@ -116,14 +153,34 @@
             });
 
             if (response.ok) {
-                alert("Saved!");
-                // Clear inputs
                 document.getElementById('new-site').value = "";
                 document.getElementById('new-user').value = "";
                 document.getElementById('new-pass').value = "";
-                // Refresh the list
                 loadPasswords();
             }
+        }
+
+        async function deletePassword(id) {
+            if(!confirm("Delete this password?")) return;
+
+            const response = await fetch('/api/delete_password', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-access-token': sessionToken
+                },
+                body: JSON.stringify({ id: id })
+            });
+
+            if(response.ok) loadPasswords();
+        }
+
+        function logout() {
+            location.reload();
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => alert("Copied!"));
         }
     </script>
 </body>
