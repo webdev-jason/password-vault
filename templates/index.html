@@ -18,11 +18,11 @@
     <div class="app-container">
         
         <div id="login-section" class="card">
-            <h2>🔐 Secure Vault</h2>
+            <h2>🔐 Password Vault</h2>
             <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem;">Enter credentials to unlock</p>
             <div class="input-group">
                 <label>Username</label>
-                <input type="text" id="login-user" autocomplete="off">
+                <input type="text" id="login-user" autocomplete="off" autocapitalize="off" autocorrect="off">
             </div>
             <div class="input-group">
                 <label>Master Password</label>
@@ -44,7 +44,7 @@
 
             <div class="card">
                 <div class="input-group"><input type="text" id="new-site" placeholder="Website (e.g. Netflix)"></div>
-                <div class="input-group"><input type="text" id="new-user" placeholder="Username / Email"></div>
+                <div class="input-group"><input type="text" id="new-user" placeholder="Username / Email" autocapitalize="off" autocorrect="off"></div>
                 <div class="input-group" style="display: flex;">
                     <input type="text" id="new-pass" placeholder="Password">
                     <button class="btn btn-generate" onclick="generateRandomPassword()" title="Generate Random">
@@ -65,16 +65,43 @@
     </div>
 
     <script>
+        let inactivityTimer;
+
+        // --- 0. INIT & INACTIVITY TRACKER ---
         window.onload = async function() {
+            // Setup Activity Listeners
+            document.onmousemove = resetTimer;
+            document.onkeypress = resetTimer;
+            document.onclick = resetTimer;
+            document.onscroll = resetTimer;
+            document.ontouchstart = resetTimer; 
+            
+            // Check for existing session
             const savedKey = sessionStorage.getItem('masterKey');
             if (savedKey) {
                 try {
                     const response = await fetch('/api/check_session');
-                    if (response.ok) showVault(savedKey);
-                    else sessionStorage.removeItem('masterKey');
+                    if (response.ok) {
+                        showVault(savedKey);
+                        resetTimer(); 
+                    } else {
+                        sessionStorage.removeItem('masterKey');
+                    }
                 } catch(e) { console.log("Server unreachable"); }
             }
         };
+
+        function resetTimer() {
+            const vaultSection = document.getElementById('vault-section');
+            if (vaultSection.classList.contains('hidden')) return;
+
+            clearTimeout(inactivityTimer);
+            
+            inactivityTimer = setTimeout(() => {
+                alert("You have been logged out due to inactivity.");
+                logout();
+            }, 60000);
+        }
 
         /* --- UTILITIES --- */
         function generateRandomPassword() {
@@ -93,6 +120,7 @@
         }
 
         async function logout() {
+            clearTimeout(inactivityTimer); 
             await fetch('/api/logout', { method: 'POST' });
             sessionStorage.removeItem('masterKey');
             location.reload();
@@ -102,6 +130,7 @@
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('vault-section').classList.remove('hidden');
             loadPasswords(masterKey);
+            resetTimer(); 
         }
 
         /* --- API CALLS --- */
