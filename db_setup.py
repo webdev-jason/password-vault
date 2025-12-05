@@ -1,17 +1,20 @@
-import sqlite3
+import psycopg2
+import os
+from dotenv import load_dotenv
+
+# Load the connection string from .env
+load_dotenv()
 
 def create_tables():
-    # Connect to the database. 
-    # If 'vault.db' doesn't exist, this line creates it automatically.
-    conn = sqlite3.connect('vault.db')
-    cursor = conn.cursor()
+    print("Connecting to Neon Database...")
+    conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
+    cur = conn.cursor()
 
-    # 1. Create the Users table
-    # We store 'salt' and 'password_hash' instead of the real password.
-    # We store 'two_factor_secret' for the authenticator app.
-    cursor.execute('''
+    # 1. Create Users Table
+    # Note: 'SERIAL' is the Postgres way of saying Auto-Increment
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
@@ -19,12 +22,10 @@ def create_tables():
         )
     ''')
 
-    # 2. Create the Passwords table
-    # 'encrypted_password' will hold the gibberish string we create later.
-    # 'user_id' links this password to the user above (Foreign Key).
-    cursor.execute('''
+    # 2. Create Passwords Table
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS passwords (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             site_name TEXT NOT NULL,
             site_username TEXT NOT NULL,
@@ -34,8 +35,9 @@ def create_tables():
     ''')
 
     conn.commit()
+    cur.close()
     conn.close()
-    print("Database structure created successfully in 'vault.db'.")
+    print("SUCCESS: Tables created in the Cloud!")
 
 if __name__ == '__main__':
     create_tables()

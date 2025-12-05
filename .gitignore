@@ -2,8 +2,11 @@
 venv/
 __pycache__/
 
-# Ignore the database file (SECURITY CRITICAL)
+# Ignore the database file
 *.db
 
 # Ignore generic system files
 .DS_Store
+
+# SECURITY: Ignore environment variables
+.env

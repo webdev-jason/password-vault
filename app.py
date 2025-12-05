@@ -1,26 +1,27 @@
 from flask import Flask, request, jsonify, render_template, make_response
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import pyotp
 import crypto_manager
 import jwt 
 import datetime
 import os
 from functools import wraps
+from dotenv import load_dotenv
+
+# 1. Load the secret passwords from the .env file
+load_dotenv()
 
 app = Flask(__name__)
-# In production, this must be a random string hidden in environment variables
-app.config['SECRET_KEY'] = 'super_secret_enterprise_key_change_this_in_prod'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 
+# UTILITY: Database Connection (PostgreSQL)
 def get_db_connection():
-    # We use absolute path to ensure we always find the DB, even on servers
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    db_path = os.path.join(basedir, 'vault.db')
-    
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row 
+    # Connect to Neon using the URL in .env
+    conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
     return conn
 
-# UTILITY: The "Bouncer" (Checks Cookies)
+# UTILITY: The "Bouncer"
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -43,11 +44,16 @@ def token_required(f):
 
 def verify_password_logic(user_id, master_password):
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # POSTGRES CHANGE: Use %s instead of ?
+    cur.execute('SELECT * FROM users WHERE id = %s', (user_id,))
+    user = cur.fetchone()
+    
+    cur.close()
     conn.close()
 
-    if not user:
-        return None
+    if not user: return None
     
     if crypto_manager.verify_master_password(master_password, user['salt'], user['password_hash']):
         return user
@@ -66,22 +72,25 @@ def privacy():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
-    username = data.get('username')
-    password_input = data.get('password')
-    code_input = data.get('2fa_code')
-
+    
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # POSTGRES CHANGE: Use %s for placeholders
+    cur.execute('SELECT * FROM users WHERE username = %s', (data.get('username'),))
+    user = cur.fetchone()
+    
+    cur.close()
     conn.close()
 
     if not user: return jsonify({"error": "User not found"}), 404
 
     # Verify Password & 2FA
-    if not crypto_manager.verify_master_password(password_input, user['salt'], user['password_hash']):
+    if not crypto_manager.verify_master_password(data.get('password'), user['salt'], user['password_hash']):
         return jsonify({"error": "Invalid Password"}), 401
     
     totp = pyotp.TOTP(user['two_factor_secret'])
-    if not totp.verify(code_input):
+    if not totp.verify(data.get('2fa_code')):
         return jsonify({"error": "Invalid 2FA Code"}), 401
 
     # Generate Token
@@ -90,7 +99,6 @@ def login():
         'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60)
     }, app.config['SECRET_KEY'], algorithm="HS256")
 
-    # CREATE RESPONSE WITH COOKIE
     resp = make_response(jsonify({"message": "Login Successful"}))
     resp.set_cookie('token', token, httponly=True, samesite='Strict')
     
@@ -114,19 +122,22 @@ def add_password_entry(current_user_id):
     master_password = data.get('master_password') 
     
     user = verify_password_logic(current_user_id, master_password)
-    if not user:
-        return jsonify({"error": "Invalid Master Password"}), 401
+    if not user: return jsonify({"error": "Invalid Master Password"}), 401
 
     salt_bytes = bytes.fromhex(user['salt'])
     encryption_key = crypto_manager.derive_encryption_key(master_password, salt_bytes)
     encrypted_pw = crypto_manager.encrypt_val(encryption_key, data.get('site_password'))
 
     conn = get_db_connection()
-    conn.execute('''
+    cur = conn.cursor()
+    
+    cur.execute('''
         INSERT INTO passwords (user_id, site_name, site_username, encrypted_password)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
     ''', (current_user_id, data.get('site_name'), data.get('site_username'), encrypted_pw))
+    
     conn.commit()
+    cur.close()
     conn.close()
 
     return jsonify({"message": "Password Saved"}), 201
@@ -138,14 +149,18 @@ def get_all_passwords(current_user_id):
     master_password = data.get('master_password')
 
     user = verify_password_logic(current_user_id, master_password)
-    if not user:
-        return jsonify({"error": "Invalid Master Password"}), 401
+    if not user: return jsonify({"error": "Invalid Master Password"}), 401
 
     salt_bytes = bytes.fromhex(user['salt'])
     encryption_key = crypto_manager.derive_encryption_key(master_password, salt_bytes)
 
     conn = get_db_connection()
-    rows = conn.execute('SELECT id, site_name, site_username, encrypted_password FROM passwords WHERE user_id = ?', (current_user_id,)).fetchall()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cur.execute('SELECT id, site_name, site_username, encrypted_password FROM passwords WHERE user_id = %s', (current_user_id,))
+    rows = cur.fetchall()
+    
+    cur.close()
     conn.close()
 
     results = []
@@ -158,8 +173,7 @@ def get_all_passwords(current_user_id):
                 "username": row['site_username'],
                 "password": decrypted_pw
             })
-        except Exception:
-            pass
+        except Exception: pass
 
     return jsonify(results), 200
 
@@ -171,26 +185,23 @@ def update_password_entry(current_user_id):
     master_password = data.get('master_password')
     
     user = verify_password_logic(current_user_id, master_password)
-    if not user:
-        return jsonify({"error": "Invalid Master Password"}), 401
+    if not user: return jsonify({"error": "Invalid Master Password"}), 401
 
     salt_bytes = bytes.fromhex(user['salt'])
     encryption_key = crypto_manager.derive_encryption_key(master_password, salt_bytes)
     encrypted_pw = crypto_manager.encrypt_val(encryption_key, data.get('site_password'))
 
     conn = get_db_connection()
-    conn.execute('''
+    cur = conn.cursor()
+    
+    cur.execute('''
         UPDATE passwords 
-        SET site_name = ?, site_username = ?, encrypted_password = ?
-        WHERE id = ? AND user_id = ?
-    ''', (
-        data.get('site_name'), 
-        data.get('site_username'), 
-        encrypted_pw, 
-        password_id, 
-        current_user_id
-    ))
+        SET site_name = %s, site_username = %s, encrypted_password = %s
+        WHERE id = %s AND user_id = %s
+    ''', (data.get('site_name'), data.get('site_username'), encrypted_pw, password_id, current_user_id))
+    
     conn.commit()
+    cur.close()
     conn.close()
 
     return jsonify({"message": "Updated successfully"}), 200
@@ -199,11 +210,15 @@ def update_password_entry(current_user_id):
 @token_required
 def delete_password_entry(current_user_id):
     data = request.json
-    password_id = data.get('id')
     conn = get_db_connection()
-    conn.execute('DELETE FROM passwords WHERE id = ? AND user_id = ?', (password_id, current_user_id))
+    cur = conn.cursor()
+    
+    cur.execute('DELETE FROM passwords WHERE id = %s AND user_id = %s', (data.get('id'), current_user_id))
+    
     conn.commit()
+    cur.close()
     conn.close()
+    
     return jsonify({"message": "Deleted successfully"}), 200
 
 if __name__ == '__main__':
