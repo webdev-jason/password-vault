@@ -67,21 +67,8 @@
         </p>
     </div>
 
-    <script>
-        // SPAM BOT PROTECTION
-        // We construct the email in reverse so simple scrapers can't read it.
-        document.addEventListener("DOMContentLoaded", function() {
-            // Updated to your new email address
-            const user = "appcontactpwvault"; 
-            const domain = "gmail.com"; 
-            
-            const link = document.getElementById('contact-link');
-            const email = user + '@' + domain;
-            
-            link.innerText = email;
-            link.href = "mailto:" + email;
-        });
-    </script>
+    <!-- Link to the External JS File -->
+    <script src="{{ url_for('static', filename='privacy.js') }}?v=1"></script>
 
 </body>
 </html>
