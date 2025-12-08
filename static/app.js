@@ -301,3 +301,81 @@ async function loadPasswords(masterKey) {
         listDiv.appendChild(item);
     });
 }
+
+// --- RESTORED CRUD FUNCTIONS ---
+
+function toggleEdit(id) {
+    const displayRow = document.getElementById(`display-${id}`);
+    const editRow = document.getElementById(`edit-${id}`);
+    
+    if (displayRow.classList.contains('hidden')) {
+        displayRow.classList.remove('hidden');
+        editRow.classList.add('hidden');
+    } else {
+        displayRow.classList.add('hidden');
+        editRow.classList.remove('hidden');
+    }
+}
+
+async function saveEdit(id) {
+    const site = document.getElementById(`edit-site-${id}`).value;
+    const user = document.getElementById(`edit-user-${id}`).value;
+    const pass = document.getElementById(`edit-pass-${id}`).value;
+    const masterKey = sessionStorage.getItem('masterKey');
+
+    const response = await fetch('/api/update_password', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            id: id,
+            master_password: masterKey,
+            site_name: site,
+            site_username: user,
+            site_password: pass
+        })
+    });
+
+    if (response.ok) {
+        loadPasswords(masterKey); 
+    } else {
+        alert("Failed to update");
+    }
+}
+
+async function addPassword() {
+    const site = document.getElementById('new-site').value;
+    const user = document.getElementById('new-user').value;
+    const pass = document.getElementById('new-pass').value;
+    const masterKey = sessionStorage.getItem('masterKey');
+
+    if(!site || !pass) return alert("Site and Password are required");
+
+    const response = await fetch('/api/add_password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            master_password: masterKey,
+            site_name: site,
+            site_username: user,
+            site_password: pass
+        })
+    });
+
+    if (response.ok) {
+        document.getElementById('new-site').value = "";
+        document.getElementById('new-user').value = "";
+        document.getElementById('new-pass').value = "";
+        loadPasswords(masterKey);
+    }
+}
+
+async function deletePassword(id) {
+    if(!confirm("Are you sure?")) return;
+    const masterKey = sessionStorage.getItem('masterKey');
+    const response = await fetch('/api/delete_password', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ id: id })
+    });
+    if(response.ok) loadPasswords(masterKey);
+}
