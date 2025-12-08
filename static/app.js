@@ -1,56 +1,42 @@
 /* static/app.js */
 
-let warningTimer; // Starts at 4 minutes (240s)
-let logoutTimer;  // Failsafe at 5 minutes (300s)
-let countdownInterval; // Updates the visual number
+let warningTimer; 
+let logoutTimer;  
+let countdownInterval;
+let confirmAction = null; 
+let promptCallback = null; // Stores function for Prompt modal
+let alertCallback = null;  // Stores function for Alert modal
 
 window.onload = async function() {
-    // Setup Activity Listeners
     document.onmousemove = resetTimer;
     document.onkeypress = resetTimer;
     document.onclick = resetTimer;
     document.onscroll = resetTimer;
     document.ontouchstart = resetTimer; 
     
-    // NEW: Expanded Validation Regex for "Banned Characters"
     const bannedChars = /[\s\\^~"'\[\]{};|]/;
 
-    // Listener for Settings Password
     const newPassInput = document.getElementById('set-new-pass');
     if (newPassInput) {
         newPassInput.addEventListener('input', function(e) {
             const bubble = document.getElementById('pass-bubble');
-            if (bannedChars.test(this.value)) {
-                bubble.classList.add('visible');
-            } else {
-                bubble.classList.remove('visible');
-            }
+            if (bannedChars.test(this.value)) { bubble.classList.add('visible'); } else { bubble.classList.remove('visible'); }
         });
     }
 
-    // Listener for Registration Password
     const regPassInput = document.getElementById('reg-pass');
     if (regPassInput) {
         regPassInput.addEventListener('input', function(e) {
             const bubble = document.getElementById('reg-bubble');
-            if (bannedChars.test(this.value)) {
-                bubble.classList.add('visible');
-            } else {
-                bubble.classList.remove('visible');
-            }
+            if (bannedChars.test(this.value)) { bubble.classList.add('visible'); } else { bubble.classList.remove('visible'); }
         });
     }
 
-    // NEW: Listener for Registration Username
     const regUserInput = document.getElementById('reg-user');
     if (regUserInput) {
         regUserInput.addEventListener('input', function(e) {
             const bubble = document.getElementById('user-bubble');
-            if (bannedChars.test(this.value)) {
-                bubble.classList.add('visible');
-            } else {
-                bubble.classList.remove('visible');
-            }
+            if (bannedChars.test(this.value)) { bubble.classList.add('visible'); } else { bubble.classList.remove('visible'); }
         });
     }
 
@@ -72,29 +58,94 @@ window.onload = async function() {
     }
 };
 
+/* --- ALERT MODAL LOGIC --- */
+function openAlert(msg, title = "Success", callback = null) {
+    document.getElementById('alert-title').innerText = title;
+    document.getElementById('alert-text').innerText = msg;
+    alertCallback = callback;
+    document.getElementById('alert-modal').classList.remove('hidden');
+}
+
+function closeAlert() {
+    document.getElementById('alert-modal').classList.add('hidden');
+    if (alertCallback) {
+        alertCallback();
+        alertCallback = null;
+    }
+}
+
+/* --- PROMPT MODAL LOGIC --- */
+function openPrompt(msg, callback) {
+    document.getElementById('prompt-text').innerText = msg;
+    document.getElementById('prompt-input').value = ""; // Clear previous input
+    promptCallback = callback;
+    document.getElementById('prompt-modal').classList.remove('hidden');
+    document.getElementById('prompt-input').focus();
+}
+
+function performPrompt() {
+    const val = document.getElementById('prompt-input').value;
+    if (!val) return; // Don't submit empty
+    if (promptCallback) promptCallback(val);
+    closePrompt();
+}
+
+function closePrompt() {
+    document.getElementById('prompt-modal').classList.add('hidden');
+    promptCallback = null;
+}
+
+/* --- CONFIRM MODAL LOGIC --- */
+function openConfirm(msg, action) {
+    document.getElementById('confirm-text').innerText = msg;
+    confirmAction = action;
+    document.getElementById('confirm-modal').classList.remove('hidden');
+}
+
+function performConfirm() {
+    if (confirmAction) confirmAction();
+    closeConfirm();
+}
+
+function closeConfirm() {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    confirmAction = null;
+}
+
+/* --- FILTER LOGIC --- */
+function filterPasswords() {
+    const searchInput = document.getElementById('search-filter');
+    const filter = searchInput.value.toLowerCase();
+    const list = document.getElementById('password-list');
+    const items = list.getElementsByClassName('vault-item');
+
+    for (let i = 0; i < items.length; i++) {
+        const siteElement = items[i].getElementsByClassName('vault-site')[0];
+        if (siteElement) {
+            const txtValue = siteElement.textContent || siteElement.innerText;
+            if (txtValue.toLowerCase().startsWith(filter)) {
+                items[i].classList.remove('hidden');
+            } else {
+                items[i].classList.add('hidden');
+            }
+        }
+    }
+}
+
 /* --- TIMEOUT LOGIC --- */
 function resetTimer() {
     const vaultSection = document.getElementById('vault-section');
     const modal = document.getElementById('timeout-modal');
     
-    // If vault isn't open, or the modal is ALREADY visible, don't reset.
     if (vaultSection.classList.contains('hidden')) return;
     if (!modal.classList.contains('hidden')) return; 
 
-    // Clear all existing timers
     clearTimeout(warningTimer);
     clearTimeout(logoutTimer);
     clearInterval(countdownInterval);
     
-    // Timer 1: Show Warning after 4 minutes (240,000ms)
-    warningTimer = setTimeout(() => {
-        showTimeoutWarning();
-    }, 240000); 
-
-    // Timer 2: Actually Logout after 5 minutes (300,000ms)
-    logoutTimer = setTimeout(() => {
-        logout();
-    }, 300000); 
+    warningTimer = setTimeout(() => { showTimeoutWarning(); }, 240000); 
+    logoutTimer = setTimeout(() => { logout(); }, 300000); 
 }
 
 function showTimeoutWarning() {
@@ -103,10 +154,9 @@ function showTimeoutWarning() {
     
     modal.classList.remove('hidden');
     
-    let secondsLeft = 60; // 60 Second Countdown
+    let secondsLeft = 60; 
     display.innerText = secondsLeft;
 
-    // Start visual countdown
     countdownInterval = setInterval(() => {
         secondsLeft--;
         display.innerText = secondsLeft;
@@ -120,8 +170,8 @@ function showTimeoutWarning() {
 
 function stayLoggedIn() {
     document.getElementById('timeout-modal').classList.add('hidden');
-    clearInterval(countdownInterval); // Stop the countdown
-    resetTimer(); // Restart the inactivity clock
+    clearInterval(countdownInterval); 
+    resetTimer(); 
 }
 
 /* --- UTILITIES --- */
@@ -151,13 +201,12 @@ function generateRandomPassword() {
 }
 
 function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => alert("Copied!"));
+    navigator.clipboard.writeText(text).then(() => openAlert("Password copied to clipboard!"));
 }
 
-// NEW: Copy 2FA Secret
 function copySecret() {
     const code = document.getElementById('secret-code-display').innerText;
-    navigator.clipboard.writeText(code).then(() => alert("Secret Copied!"));
+    navigator.clipboard.writeText(code).then(() => openAlert("Secret Copied!", "Success"));
 }
 
 async function logout() {
@@ -198,14 +247,14 @@ function toggleRegister() {
 }
 
 async function registerUser() {
-    const user = document.getElementById('reg-user').value.trim(); // Trim spaces
+    const user = document.getElementById('reg-user').value.trim();
     const pass = document.getElementById('reg-pass').value.trim();
     const passConfirm = document.getElementById('reg-pass-confirm').value.trim();
     const btn = document.querySelector('#register-section .btn-primary');
     
-    if(!user || !pass) return alert("Username and Password required");
+    if(!user || !pass) return openAlert("Username and Password required", "Error");
     
-    if(pass !== passConfirm) return alert("Passwords do not match");
+    if(pass !== passConfirm) return openAlert("Passwords do not match", "Error");
 
     const originalText = btn.innerText;
     btn.innerText = "Creating Account...";
@@ -221,15 +270,11 @@ async function registerUser() {
         const result = await response.json();
         
         if (response.ok) {
-            // Success: Move to 2FA Setup
             document.getElementById('register-section').classList.add('hidden');
             document.getElementById('setup-2fa-section').classList.remove('hidden');
             
-            // Set QR Code and Secret
             document.getElementById('qr-image').src = "data:image/png;base64," + result.qr_code;
             document.getElementById('secret-code-display').innerText = result.secret;
-            
-            // NEW: Set the Deep Link for Mobile App
             document.getElementById('otp-link').href = result.totp_uri;
             
         } else {
@@ -245,19 +290,16 @@ async function registerUser() {
 }
 
 function finishRegistration() {
-    // 1. Grab username BEFORE clearing fields
     const newUser = document.getElementById('reg-user').value.trim();
 
     document.getElementById('setup-2fa-section').classList.add('hidden');
     document.getElementById('login-section').classList.remove('hidden');
     
-    // 2. Auto-fill the login field
     if (newUser) {
         document.getElementById('login-user').value = newUser;
-        document.getElementById('login-pass').focus(); // Move cursor to password
+        document.getElementById('login-pass').focus(); 
     }
 
-    // 3. Clear registration inputs
     document.getElementById('reg-user').value = "";
     document.getElementById('reg-pass').value = "";
     document.getElementById('reg-pass-confirm').value = "";
@@ -266,11 +308,11 @@ function finishRegistration() {
 /* --- SETTINGS LOGIC --- */
 function toggleSettings() {
     const card = document.getElementById('settings-card');
-    const addCard = document.getElementById('add-card');
+    const dashboardView = document.getElementById('dashboard-view'); 
     
     if (card.classList.contains('hidden')) {
         card.classList.remove('hidden');
-        addCard.classList.add('hidden'); 
+        dashboardView.classList.add('hidden'); 
         
         const username = sessionStorage.getItem('currentUser');
         if (username) {
@@ -278,7 +320,7 @@ function toggleSettings() {
         }
     } else {
         card.classList.add('hidden');
-        addCard.classList.remove('hidden');
+        dashboardView.classList.remove('hidden'); 
     }
 }
 
@@ -287,80 +329,77 @@ async function updateAccount() {
     const newPass = document.getElementById('set-new-pass').value;
     const currentKey = sessionStorage.getItem('masterKey');
 
-    if (!newUser && !newPass) return alert("Please enter a new username or password.");
+    if (!newUser && !newPass) return openAlert("Please enter a new username or password.", "Error");
     
     const bannedChars = /[\s\\^~"'\[\]{};|]/;
     if (newPass) {
-        if (bannedChars.test(newPass)) return alert("Password contains invalid characters.");
-        if (newPass.length < 8) return alert("Password must be at least 8 characters.");
+        if (bannedChars.test(newPass)) return openAlert("Password contains invalid characters.", "Error");
+        if (newPass.length < 8) return openAlert("Password must be at least 8 characters.", "Error");
     }
     
-    if (!confirm("Changing your Password will re-encrypt your entire vault. This cannot be undone. Continue?")) return;
+    openConfirm("Changing your Password will re-encrypt your entire vault. This cannot be undone. Continue?", async () => {
+        const btn = document.querySelector('#settings-card .btn-primary');
+        const originalText = btn.innerText;
+        btn.innerText = "Processing Encryption...";
+        btn.disabled = true;
 
-    const btn = document.querySelector('#settings-card .btn-primary');
-    const originalText = btn.innerText;
-    btn.innerText = "Processing Encryption...";
-    btn.disabled = true;
+        try {
+            const response = await fetch('/api/update_account', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    current_password: currentKey,
+                    new_username: newUser,
+                    new_password: newPass
+                })
+            });
 
-    try {
-        const response = await fetch('/api/update_account', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                current_password: currentKey,
-                new_username: newUser,
-                new_password: newPass
-            })
-        });
+            const result = await response.json();
 
-        const result = await response.json();
-
-        if (response.ok) {
-            alert("Account Updated! Please log in with your new credentials.");
-            logout(); 
-        } else {
-            alert("Error: " + result.error);
+            if (response.ok) {
+                openAlert("Account Updated! Please log in with your new credentials.", "Success", logout);
+            } else {
+                openAlert("Error: " + result.error, "Error");
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        } catch (e) {
+            openAlert("Server Error", "Error");
             btn.innerText = originalText;
             btn.disabled = false;
         }
-    } catch (e) {
-        alert("Server Error");
-        btn.innerText = originalText;
-        btn.disabled = false;
-    }
+    });
 }
 
 async function deleteAccount() {
-    if (!confirm("⚠️ DANGER: This will permanently delete your account and ALL saved passwords. This cannot be undone.\n\nAre you absolutely sure?")) return;
-    
-    const password = prompt("Please enter your Password to confirm deletion:");
-    if (!password) return;
+    openConfirm("⚠️ DANGER: This will permanently delete your account and ALL saved passwords. This cannot be undone.", () => {
+        // Use custom Prompt Modal instead of native prompt()
+        openPrompt("Please enter your Password to confirm deletion:", async (password) => {
+            const cleanPassword = password.trim();
 
-    // NEW: Auto-trim whitespace from mobile keyboard
-    const cleanPassword = password.trim();
+            try {
+                const response = await fetch('/api/delete_account', {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ password: cleanPassword })
+                });
 
-    try {
-        const response = await fetch('/api/delete_account', {
-            method: 'DELETE',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ password: cleanPassword })
+                if (response.ok) {
+                    openAlert("Account Deleted.", "Goodbye", logout);
+                } else {
+                    const result = await response.json();
+                    openAlert("Deletion Failed: " + (result.error || "Unknown error"), "Error");
+                }
+            } catch (e) {
+                openAlert("Server connection error.", "Error");
+            }
         });
-
-        if (response.ok) {
-            alert("Account Deleted.");
-            logout();
-        } else {
-            const result = await response.json();
-            alert("Deletion Failed: " + (result.error || "Unknown error"));
-        }
-    } catch (e) {
-        alert("Server connection error.");
-    }
+    });
 }
 
 /* --- API CALLS --- */
 async function attemptLogin() {
-    const user = document.getElementById('login-user').value.trim(); // Trim for login too
+    const user = document.getElementById('login-user').value.trim();
     const pass = document.getElementById('login-pass').value.trim();
     const code = document.getElementById('login-code').value;
     const btn = document.querySelector('#login-section .btn');
@@ -440,6 +479,9 @@ async function loadPasswords(masterKey) {
         `;
         listDiv.appendChild(item);
     });
+    
+    // Re-apply filter after loading
+    filterPasswords();
 }
 
 function toggleEdit(id) {
@@ -476,7 +518,7 @@ async function saveEdit(id) {
     if (response.ok) {
         loadPasswords(masterKey); 
     } else {
-        alert("Failed to update");
+        openAlert("Failed to update", "Error");
     }
 }
 
@@ -486,7 +528,7 @@ async function addPassword() {
     const pass = document.getElementById('new-pass').value;
     const masterKey = sessionStorage.getItem('masterKey');
 
-    if(!site || !pass) return alert("Site and Password are required");
+    if(!site || !pass) return openAlert("Site and Password are required", "Error");
 
     const response = await fetch('/api/add_password', {
         method: 'POST',
@@ -508,12 +550,13 @@ async function addPassword() {
 }
 
 async function deletePassword(id) {
-    if(!confirm("Are you sure?")) return;
-    const masterKey = sessionStorage.getItem('masterKey');
-    const response = await fetch('/api/delete_password', {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ id: id })
+    openConfirm("Are you sure you want to delete this password?", async () => {
+        const masterKey = sessionStorage.getItem('masterKey');
+        const response = await fetch('/api/delete_password', {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ id: id })
+        });
+        if(response.ok) loadPasswords(masterKey);
     });
-    if(response.ok) loadPasswords(masterKey);
 }
