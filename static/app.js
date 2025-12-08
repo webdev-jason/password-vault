@@ -1,8 +1,9 @@
 /* static/app.js */
 
-let inactivityTimer;
+let warningTimer; // Starts at 4 minutes (240s)
+let logoutTimer;  // Failsafe at 5 minutes (300s)
+let countdownInterval; // Updates the visual number
 
-// --- 0. INIT & INACTIVITY TRACKER ---
 window.onload = async function() {
     // Setup Activity Listeners
     document.onmousemove = resetTimer;
@@ -11,39 +12,94 @@ window.onload = async function() {
     document.onscroll = resetTimer;
     document.ontouchstart = resetTimer; 
     
-    // Check for existing session
+    // NEW: Expanded Validation Regex for "Banned Characters"
+    const bannedChars = /[\s\\^~"'\[\]{};|]/;
+
+    const newPassInput = document.getElementById('set-new-pass');
+    if (newPassInput) {
+        newPassInput.addEventListener('input', function(e) {
+            const bubble = document.getElementById('pass-bubble');
+            if (bannedChars.test(this.value)) {
+                bubble.classList.add('visible');
+            } else {
+                bubble.classList.remove('visible');
+            }
+        });
+    }
+
     const savedKey = sessionStorage.getItem('masterKey');
     if (savedKey) {
         try {
             const response = await fetch('/api/check_session');
+            const data = await response.json();
+            
             if (response.ok) {
+                if(data.username) sessionStorage.setItem('currentUser', data.username);
                 showVault(savedKey);
                 resetTimer(); 
             } else {
                 sessionStorage.removeItem('masterKey');
+                sessionStorage.removeItem('currentUser');
             }
         } catch(e) { console.log("Server unreachable"); }
     }
 };
 
+/* --- TIMEOUT LOGIC --- */
 function resetTimer() {
     const vaultSection = document.getElementById('vault-section');
-    if (vaultSection.classList.contains('hidden')) return;
-
-    clearTimeout(inactivityTimer);
+    const modal = document.getElementById('timeout-modal');
     
-    inactivityTimer = setTimeout(() => {
-        alert("You have been logged out due to inactivity.");
+    // If vault isn't open, or the modal is ALREADY visible, don't reset.
+    if (vaultSection.classList.contains('hidden')) return;
+    if (!modal.classList.contains('hidden')) return; 
+
+    // Clear all existing timers
+    clearTimeout(warningTimer);
+    clearTimeout(logoutTimer);
+    clearInterval(countdownInterval);
+    
+    // Timer 1: Show Warning after 4 minutes (240,000ms)
+    warningTimer = setTimeout(() => {
+        showTimeoutWarning();
+    }, 240000); 
+
+    // Timer 2: Actually Logout after 5 minutes (300,000ms)
+    logoutTimer = setTimeout(() => {
         logout();
-    }, 60000);
+    }, 300000); 
+}
+
+function showTimeoutWarning() {
+    const modal = document.getElementById('timeout-modal');
+    const display = document.getElementById('countdown-timer');
+    
+    modal.classList.remove('hidden');
+    
+    let secondsLeft = 60; // 60 Second Countdown
+    display.innerText = secondsLeft;
+
+    // Start visual countdown
+    countdownInterval = setInterval(() => {
+        secondsLeft--;
+        display.innerText = secondsLeft;
+        
+        if (secondsLeft <= 0) {
+            clearInterval(countdownInterval);
+            logout();
+        }
+    }, 1000);
+}
+
+function stayLoggedIn() {
+    document.getElementById('timeout-modal').classList.add('hidden');
+    clearInterval(countdownInterval); // Stop the countdown
+    resetTimer(); // Restart the inactivity clock
 }
 
 /* --- UTILITIES --- */
-
 function togglePassword(inputId, btn) {
     const input = document.getElementById(inputId);
-    
-    // Icons
     const iconEye = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
     const iconSlash = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
 
@@ -72,17 +128,94 @@ function copyToClipboard(text) {
 }
 
 async function logout() {
-    clearTimeout(inactivityTimer); 
+    clearTimeout(warningTimer);
+    clearTimeout(logoutTimer);
+    clearInterval(countdownInterval);
+    
     await fetch('/api/logout', { method: 'POST' });
     sessionStorage.removeItem('masterKey');
+    sessionStorage.removeItem('currentUser');
     location.reload();
 }
 
 function showVault(masterKey) {
     document.getElementById('login-section').classList.add('hidden');
     document.getElementById('vault-section').classList.remove('hidden');
+    
+    const username = sessionStorage.getItem('currentUser') || 'My';
+    const formattedUser = username.charAt(0).toUpperCase() + username.slice(1) + "'s";
+    document.getElementById('header-username').innerText = formattedUser;
+    
     loadPasswords(masterKey);
     resetTimer(); 
+}
+
+/* --- SETTINGS LOGIC --- */
+function toggleSettings() {
+    const card = document.getElementById('settings-card');
+    const addCard = document.getElementById('add-card');
+    
+    if (card.classList.contains('hidden')) {
+        card.classList.remove('hidden');
+        addCard.classList.add('hidden'); 
+        
+        const username = sessionStorage.getItem('currentUser');
+        if (username) {
+            document.getElementById('set-new-user').placeholder = username;
+        }
+    } else {
+        card.classList.add('hidden');
+        addCard.classList.remove('hidden');
+    }
+}
+
+async function updateAccount() {
+    const newUser = document.getElementById('set-new-user').value;
+    const newPass = document.getElementById('set-new-pass').value;
+    const currentKey = sessionStorage.getItem('masterKey');
+
+    if (!newUser && !newPass) return alert("Please enter a new username or password.");
+    
+    // Client-Side Validation
+    const bannedChars = /[\s\\^~"'\[\]{};|]/;
+    if (newPass) {
+        if (bannedChars.test(newPass)) return alert("Password contains invalid characters.");
+        if (newPass.length < 8) return alert("Password must be at least 8 characters.");
+    }
+    
+    if (!confirm("Changing your Password will re-encrypt your entire vault. This cannot be undone. Continue?")) return;
+
+    const btn = document.querySelector('#settings-card .btn-primary');
+    const originalText = btn.innerText;
+    btn.innerText = "Processing Encryption...";
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/update_account', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                current_password: currentKey,
+                new_username: newUser,
+                new_password: newPass
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert("Account Updated! Please log in with your new credentials.");
+            logout(); 
+        } else {
+            alert("Error: " + result.error);
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    } catch (e) {
+        alert("Server Error");
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
 }
 
 /* --- API CALLS --- */
@@ -103,6 +236,7 @@ async function attemptLogin() {
         const result = await response.json();
         if (response.ok) {
             sessionStorage.setItem('masterKey', pass);
+            if(result.username) sessionStorage.setItem('currentUser', result.username);
             showVault(pass);
         } else {
             document.getElementById('error-msg').innerText = result.error || "Login Failed";
@@ -152,15 +286,12 @@ async function loadPasswords(masterKey) {
             <div id="edit-${p.id}" class="edit-mode-inputs hidden">
                 <input type="text" id="edit-site-${p.id}" value="${p.site}">
                 <input type="text" id="edit-user-${p.id}" value="${p.username}">
-                
-                <!-- WRAPPED WITH EYE ICON FOR EDIT MODE -->
                 <div class="password-wrapper">
                     <input type="password" id="edit-pass-${p.id}" value="${p.password}">
                     <button class="btn-eye" onclick="togglePassword('edit-pass-${p.id}', this)" type="button">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     </button>
                 </div>
-
                 <div style="display:flex; gap:10px; margin-top:5px;">
                     <button class="btn btn-primary" onclick="saveEdit(${p.id})" style="padding: 5px;">Save</button>
                     <button class="btn btn-danger" onclick="toggleEdit(${p.id})" style="padding: 5px; color: var(--text-main);">Cancel</button>
@@ -169,80 +300,4 @@ async function loadPasswords(masterKey) {
         `;
         listDiv.appendChild(item);
     });
-}
-
-function toggleEdit(id) {
-    const displayRow = document.getElementById(`display-${id}`);
-    const editRow = document.getElementById(`edit-${id}`);
-    
-    if (displayRow.classList.contains('hidden')) {
-        displayRow.classList.remove('hidden');
-        editRow.classList.add('hidden');
-    } else {
-        displayRow.classList.add('hidden');
-        editRow.classList.remove('hidden');
-    }
-}
-
-async function saveEdit(id) {
-    const site = document.getElementById(`edit-site-${id}`).value;
-    const user = document.getElementById(`edit-user-${id}`).value;
-    const pass = document.getElementById(`edit-pass-${id}`).value;
-    const masterKey = sessionStorage.getItem('masterKey');
-
-    const response = await fetch('/api/update_password', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            id: id,
-            master_password: masterKey,
-            site_name: site,
-            site_username: user,
-            site_password: pass
-        })
-    });
-
-    if (response.ok) {
-        loadPasswords(masterKey); 
-    } else {
-        alert("Failed to update");
-    }
-}
-
-async function addPassword() {
-    const site = document.getElementById('new-site').value;
-    const user = document.getElementById('new-user').value;
-    const pass = document.getElementById('new-pass').value;
-    const masterKey = sessionStorage.getItem('masterKey');
-
-    if(!site || !pass) return alert("Site and Password are required");
-
-    const response = await fetch('/api/add_password', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            master_password: masterKey,
-            site_name: site,
-            site_username: user,
-            site_password: pass
-        })
-    });
-
-    if (response.ok) {
-        document.getElementById('new-site').value = "";
-        document.getElementById('new-user').value = "";
-        document.getElementById('new-pass').value = "";
-        loadPasswords(masterKey);
-    }
-}
-
-async function deletePassword(id) {
-    if(!confirm("Are you sure?")) return;
-    const masterKey = sessionStorage.getItem('masterKey');
-    const response = await fetch('/api/delete_password', {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ id: id })
-    });
-    if(response.ok) loadPasswords(masterKey);
 }

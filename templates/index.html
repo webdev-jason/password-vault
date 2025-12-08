@@ -11,13 +11,15 @@
         .footer { text-align: center; margin-top: 30px; font-size: 0.8rem; color: var(--text-muted); }
         .footer a { color: var(--text-muted); text-decoration: none; }
         .footer a:hover { color: var(--primary); text-decoration: underline; }
+        .header-actions { display: flex; gap: 15px; font-size: 0.9rem; align-items: center; }
+        .link-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; text-decoration: underline; padding: 0; font-size: 0.9rem; }
+        .link-btn:hover { color: var(--primary); }
     </style>
 </head>
 <body>
 
     <div class="app-container">
         
-        <!-- SECTION: LOGIN -->
         <div id="login-section" class="card">
             <h2>🔐 Password Vault</h2>
             <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem;">Enter credentials to unlock</p>
@@ -26,7 +28,7 @@
                 <input type="text" id="login-user" autocomplete="off" autocapitalize="off" autocorrect="off">
             </div>
             <div class="input-group">
-                <label>Master Password</label>
+                <label>Password</label>
                 <div class="password-wrapper">
                     <input type="password" id="login-pass">
                     <button class="btn-eye" onclick="togglePassword('login-pass', this)" type="button">
@@ -42,15 +44,39 @@
             <div id="error-msg" class="text-error"></div>
         </div>
 
-        <!-- SECTION: DASHBOARD -->
         <div id="vault-section" class="hidden">
             <div class="header-row">
-                <h2>My Passwords</h2>
-                <a href="#" onclick="logout()" class="logout-link">Log Out</a>
+                <h2><span id="header-username">My</span> Passwords</h2>
+                <div class="header-actions">
+                    <button onclick="toggleSettings()" class="link-btn">Settings</button>
+                    <button onclick="logout()" class="link-btn">Log Out</button>
+                </div>
             </div>
 
-            <!-- Add New -->
-            <div class="card">
+            <div id="settings-card" class="card hidden" style="border-left: 5px solid var(--primary);">
+                <h3 style="margin-top:0;">Account Settings</h3>
+                <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom: 1rem;">Update credentials. Leave blank to keep unchanged.</p>
+                
+                <div class="input-group">
+                    <label>New Username</label>
+                    <input type="text" id="set-new-user" autocapitalize="off" autocorrect="off">
+                </div>
+                <div class="input-group">
+                    <label>New Password</label>
+                    <div class="password-wrapper">
+                        <div id="pass-bubble" class="validation-bubble">Invalid character detected (space, quotes, \, ;, {}, [], |)</div>
+                        
+                        <input type="password" id="set-new-pass">
+                        <button class="btn-eye" onclick="togglePassword('set-new-pass', this)" type="button">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="updateAccount()">Update Account</button>
+                <button class="btn btn-danger" onclick="toggleSettings()" style="margin-top: 10px; color: var(--text-main);">Cancel</button>
+            </div>
+
+            <div class="card" id="add-card">
                 <div class="input-group"><input type="text" id="new-site" placeholder="Website (e.g. Netflix)"></div>
                 <div class="input-group"><input type="text" id="new-user" placeholder="Username / Email" autocapitalize="off" autocorrect="off"></div>
                 <div class="input-group" style="display: flex; gap: 8px;">
@@ -67,11 +93,9 @@
                 <button class="btn btn-primary" onclick="addPassword()">Save Password</button>
             </div>
 
-            <!-- List Area -->
             <div id="password-list"></div>
         </div>
 
-        <!-- Footer with Privacy Link -->
         <div class="footer">
             <a href="/privacy" target="_blank">Privacy Policy</a>
             <span style="margin: 0 5px;">•</span>
@@ -79,7 +103,19 @@
         </div>
     </div>
 
-    <!-- Link to the External JS File -->
+    <div id="timeout-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Are you still there?</h3>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">
+                You will be logged out in <span id="countdown-timer" style="font-weight: bold; color: var(--primary);">60</span> seconds due to inactivity.
+            </p>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="stayLoggedIn()">Stay Logged In</button>
+                <button class="btn btn-danger" onclick="logout()" style="color: var(--danger); border: 1px solid var(--border);">Log Out</button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='app.js') }}?v=1"></script>
 </body>
 </html>

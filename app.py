@@ -9,15 +9,13 @@ import os
 from functools import wraps
 from dotenv import load_dotenv
 
-# 1. Load the secret passwords from the .env file
 load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 
-# UTILITY: Database Connection (PostgreSQL)
+# UTILITY: Database Connection
 def get_db_connection():
-    # Connect to Neon using the URL in .env
     conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
     return conn
 
@@ -45,11 +43,8 @@ def token_required(f):
 def verify_password_logic(user_id, master_password):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    
-    # POSTGRES CHANGE: Use %s instead of ?
     cur.execute('SELECT * FROM users WHERE id = %s', (user_id,))
     user = cur.fetchone()
-    
     cur.close()
     conn.close()
 
@@ -72,20 +67,16 @@ def privacy():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
-    
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
-    # POSTGRES CHANGE: Use %s for placeholders
     cur.execute('SELECT * FROM users WHERE username = %s', (data.get('username'),))
     user = cur.fetchone()
-    
     cur.close()
     conn.close()
 
     if not user: return jsonify({"error": "User not found"}), 404
 
-    # Verify Password & 2FA
     if not crypto_manager.verify_master_password(data.get('password'), user['salt'], user['password_hash']):
         return jsonify({"error": "Invalid Password"}), 401
     
@@ -93,13 +84,15 @@ def login():
     if not totp.verify(data.get('2fa_code')):
         return jsonify({"error": "Invalid 2FA Code"}), 401
 
-    # Generate Token
     token = jwt.encode({
         'user_id': user['id'],
         'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60)
     }, app.config['SECRET_KEY'], algorithm="HS256")
 
-    resp = make_response(jsonify({"message": "Login Successful"}))
+    resp = make_response(jsonify({
+        "message": "Login Successful", 
+        "username": user['username']  
+    }))
     resp.set_cookie('token', token, httponly=True, samesite='Strict')
     
     return resp, 200
@@ -113,7 +106,16 @@ def logout():
 @app.route('/api/check_session', methods=['GET'])
 @token_required
 def check_session(current_user_id):
-    return jsonify({"status": "valid", "user_id": current_user_id}), 200
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute('SELECT username FROM users WHERE id = %s', (current_user_id,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if user:
+        return jsonify({"status": "valid", "user_id": current_user_id, "username": user['username']}), 200
+    return jsonify({"message": "User not found"}), 401
 
 @app.route('/api/add_password', methods=['POST'])
 @token_required 
@@ -122,7 +124,7 @@ def add_password_entry(current_user_id):
     master_password = data.get('master_password') 
     
     user = verify_password_logic(current_user_id, master_password)
-    if not user: return jsonify({"error": "Invalid Master Password"}), 401
+    if not user: return jsonify({"error": "Invalid Password"}), 401
 
     salt_bytes = bytes.fromhex(user['salt'])
     encryption_key = crypto_manager.derive_encryption_key(master_password, salt_bytes)
@@ -130,16 +132,13 @@ def add_password_entry(current_user_id):
 
     conn = get_db_connection()
     cur = conn.cursor()
-    
     cur.execute('''
         INSERT INTO passwords (user_id, site_name, site_username, encrypted_password)
         VALUES (%s, %s, %s, %s)
     ''', (current_user_id, data.get('site_name'), data.get('site_username'), encrypted_pw))
-    
     conn.commit()
     cur.close()
     conn.close()
-
     return jsonify({"message": "Password Saved"}), 201
 
 @app.route('/api/get_passwords', methods=['POST'])
@@ -149,17 +148,15 @@ def get_all_passwords(current_user_id):
     master_password = data.get('master_password')
 
     user = verify_password_logic(current_user_id, master_password)
-    if not user: return jsonify({"error": "Invalid Master Password"}), 401
+    if not user: return jsonify({"error": "Invalid Password"}), 401
 
     salt_bytes = bytes.fromhex(user['salt'])
     encryption_key = crypto_manager.derive_encryption_key(master_password, salt_bytes)
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    
     cur.execute('SELECT id, site_name, site_username, encrypted_password FROM passwords WHERE user_id = %s', (current_user_id,))
     rows = cur.fetchall()
-    
     cur.close()
     conn.close()
 
@@ -185,7 +182,7 @@ def update_password_entry(current_user_id):
     master_password = data.get('master_password')
     
     user = verify_password_logic(current_user_id, master_password)
-    if not user: return jsonify({"error": "Invalid Master Password"}), 401
+    if not user: return jsonify({"error": "Invalid Password"}), 401
 
     salt_bytes = bytes.fromhex(user['salt'])
     encryption_key = crypto_manager.derive_encryption_key(master_password, salt_bytes)
@@ -193,17 +190,14 @@ def update_password_entry(current_user_id):
 
     conn = get_db_connection()
     cur = conn.cursor()
-    
     cur.execute('''
         UPDATE passwords 
         SET site_name = %s, site_username = %s, encrypted_password = %s
         WHERE id = %s AND user_id = %s
     ''', (data.get('site_name'), data.get('site_username'), encrypted_pw, password_id, current_user_id))
-    
     conn.commit()
     cur.close()
     conn.close()
-
     return jsonify({"message": "Updated successfully"}), 200
 
 @app.route('/api/delete_password', methods=['DELETE'])
@@ -212,14 +206,75 @@ def delete_password_entry(current_user_id):
     data = request.json
     conn = get_db_connection()
     cur = conn.cursor()
-    
     cur.execute('DELETE FROM passwords WHERE id = %s AND user_id = %s', (data.get('id'), current_user_id))
-    
     conn.commit()
     cur.close()
     conn.close()
-    
     return jsonify({"message": "Deleted successfully"}), 200
+
+@app.route('/api/update_account', methods=['POST'])
+@token_required
+def update_account(current_user_id):
+    data = request.json
+    current_password = data.get('current_password')
+    new_username = data.get('new_username')
+    new_password = data.get('new_password')
+
+    # SERVER SIDE VALIDATION
+    # Banned: Space, Tab, Newline, Backslash, Caret, Tilde, Quotes, Brackets, Pipe, Semicolon
+    banned_chars = [' ', '\t', '\n', '\r', '\\', '^', '~', '"', "'", '{', '}', '[', ']', '|', ';']
+    
+    if new_password:
+        for char in banned_chars:
+            if char in new_password:
+                return jsonify({"error": "Password contains invalid characters"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    cur.execute('SELECT * FROM users WHERE id = %s', (current_user_id,))
+    user = cur.fetchone()
+
+    if not crypto_manager.verify_master_password(current_password, user['salt'], user['password_hash']):
+        cur.close()
+        conn.close()
+        return jsonify({"error": "Current Password incorrect"}), 401
+
+    try:
+        if new_username and new_username != user['username']:
+            cur.execute('SELECT id FROM users WHERE username = %s', (new_username,))
+            if cur.fetchone():
+                raise Exception("Username already taken")
+            cur.execute('UPDATE users SET username = %s WHERE id = %s', (new_username, current_user_id))
+
+        if new_password:
+            old_salt_bytes = bytes.fromhex(user['salt'])
+            old_key = crypto_manager.derive_encryption_key(current_password, old_salt_bytes)
+
+            cur.execute('SELECT id, encrypted_password FROM passwords WHERE user_id = %s', (current_user_id,))
+            rows = cur.fetchall()
+
+            new_salt = crypto_manager.generate_salt()
+            new_hash = crypto_manager.hash_master_password(new_password, new_salt)
+            new_key = crypto_manager.derive_encryption_key(new_password, new_salt)
+
+            for row in rows:
+                decrypted = crypto_manager.decrypt_val(old_key, row['encrypted_password'])
+                re_encrypted = crypto_manager.encrypt_val(new_key, decrypted)
+                cur.execute('UPDATE passwords SET encrypted_password = %s WHERE id = %s', (re_encrypted, row['id']))
+
+            cur.execute('UPDATE users SET password_hash = %s, salt = %s WHERE id = %s', 
+                        (new_hash, new_salt.hex(), current_user_id))
+
+        conn.commit()
+        return jsonify({"message": "Account updated successfully"}), 200
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
