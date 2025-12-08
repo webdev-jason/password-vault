@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Password Vault</title>
+    
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1">
+    
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.png') }}">
+
     <style>
         .edit-mode-inputs { display: flex; flex-direction: column; gap: 5px; width: 100%; }
         .edit-mode-inputs input { padding: 8px; font-size: 0.9rem; }
