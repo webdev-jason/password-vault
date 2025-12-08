@@ -224,9 +224,19 @@ async function registerUser() {
 }
 
 function finishRegistration() {
+    // 1. Grab username BEFORE clearing fields
+    const newUser = document.getElementById('reg-user').value;
+
     document.getElementById('setup-2fa-section').classList.add('hidden');
     document.getElementById('login-section').classList.remove('hidden');
-    // Clear inputs
+    
+    // 2. Auto-fill the login field
+    if (newUser) {
+        document.getElementById('login-user').value = newUser;
+        document.getElementById('login-pass').focus(); // Move cursor to password
+    }
+
+    // 3. Clear registration inputs
     document.getElementById('reg-user').value = "";
     document.getElementById('reg-pass').value = "";
     document.getElementById('reg-pass-confirm').value = "";
