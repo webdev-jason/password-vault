@@ -70,17 +70,25 @@ def privacy():
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.json
-    username = data.get('username')
-    password = data.get('password')
+    # MOBILE FIX: Strip whitespace automatically
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
 
     # 1. Validation
     if not username or not password:
         return jsonify({"error": "Username and Password required"}), 400
         
     banned_chars = [' ', '\t', '\n', '\r', '\\', '^', '~', '"', "'", '{', '}', '[', ']', '|', ';']
+    
+    # Check Password
     for char in banned_chars:
         if char in password:
             return jsonify({"error": "Password contains invalid characters"}), 400
+            
+    # NEW: Check Username for banned chars too
+    for char in banned_chars:
+        if char in username:
+            return jsonify({"error": "Username contains invalid characters"}), 400
             
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
@@ -117,7 +125,8 @@ def register():
         return jsonify({
             "message": "User created", 
             "qr_code": qr_b64, 
-            "secret": two_factor_secret
+            "secret": two_factor_secret,
+            "totp_uri": totp_uri # NEW: Send URI for "Tap to Setup" button
         }), 201
 
     except Exception as e:
@@ -130,17 +139,21 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
+    # MOBILE FIX: Strip whitespace to handle auto-correct spaces
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
-    cur.execute('SELECT * FROM users WHERE username = %s', (data.get('username'),))
+    cur.execute('SELECT * FROM users WHERE username = %s', (username,))
     user = cur.fetchone()
     cur.close()
     conn.close()
 
     if not user: return jsonify({"error": "User not found"}), 404
 
-    if not crypto_manager.verify_master_password(data.get('password'), user['salt'], user['password_hash']):
+    if not crypto_manager.verify_master_password(password, user['salt'], user['password_hash']):
         return jsonify({"error": "Invalid Password"}), 401
     
     totp = pyotp.TOTP(user['two_factor_secret'])
@@ -341,7 +354,7 @@ def update_account(current_user_id):
 @token_required
 def delete_account(current_user_id):
     data = request.json
-    password_check = data.get('password')
+    password_check = data.get('password', '').strip() # MOBILE FIX: Strip whitespace
     
     # 1. Verify Password again before deleting
     user = verify_password_logic(current_user_id, password_check)

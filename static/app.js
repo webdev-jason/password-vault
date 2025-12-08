@@ -41,6 +41,19 @@ window.onload = async function() {
         });
     }
 
+    // NEW: Listener for Registration Username
+    const regUserInput = document.getElementById('reg-user');
+    if (regUserInput) {
+        regUserInput.addEventListener('input', function(e) {
+            const bubble = document.getElementById('user-bubble');
+            if (bannedChars.test(this.value)) {
+                bubble.classList.add('visible');
+            } else {
+                bubble.classList.remove('visible');
+            }
+        });
+    }
+
     const savedKey = sessionStorage.getItem('masterKey');
     if (savedKey) {
         try {
@@ -141,6 +154,12 @@ function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => alert("Copied!"));
 }
 
+// NEW: Copy 2FA Secret
+function copySecret() {
+    const code = document.getElementById('secret-code-display').innerText;
+    navigator.clipboard.writeText(code).then(() => alert("Secret Copied!"));
+}
+
 async function logout() {
     clearTimeout(warningTimer);
     clearTimeout(logoutTimer);
@@ -179,14 +198,13 @@ function toggleRegister() {
 }
 
 async function registerUser() {
-    const user = document.getElementById('reg-user').value;
-    const pass = document.getElementById('reg-pass').value;
-    const passConfirm = document.getElementById('reg-pass-confirm').value;
+    const user = document.getElementById('reg-user').value.trim(); // Trim spaces
+    const pass = document.getElementById('reg-pass').value.trim();
+    const passConfirm = document.getElementById('reg-pass-confirm').value.trim();
     const btn = document.querySelector('#register-section .btn-primary');
     
     if(!user || !pass) return alert("Username and Password required");
     
-    // NEW: Check if passwords match
     if(pass !== passConfirm) return alert("Passwords do not match");
 
     const originalText = btn.innerText;
@@ -211,6 +229,9 @@ async function registerUser() {
             document.getElementById('qr-image').src = "data:image/png;base64," + result.qr_code;
             document.getElementById('secret-code-display').innerText = result.secret;
             
+            // NEW: Set the Deep Link for Mobile App
+            document.getElementById('otp-link').href = result.totp_uri;
+            
         } else {
             document.getElementById('reg-error').innerText = result.error;
             btn.innerText = originalText;
@@ -225,7 +246,7 @@ async function registerUser() {
 
 function finishRegistration() {
     // 1. Grab username BEFORE clearing fields
-    const newUser = document.getElementById('reg-user').value;
+    const newUser = document.getElementById('reg-user').value.trim();
 
     document.getElementById('setup-2fa-section').classList.add('hidden');
     document.getElementById('login-section').classList.remove('hidden');
@@ -268,7 +289,6 @@ async function updateAccount() {
 
     if (!newUser && !newPass) return alert("Please enter a new username or password.");
     
-    // Client-Side Validation
     const bannedChars = /[\s\\^~"'\[\]{};|]/;
     if (newPass) {
         if (bannedChars.test(newPass)) return alert("Password contains invalid characters.");
@@ -316,11 +336,14 @@ async function deleteAccount() {
     const password = prompt("Please enter your Password to confirm deletion:");
     if (!password) return;
 
+    // NEW: Auto-trim whitespace from mobile keyboard
+    const cleanPassword = password.trim();
+
     try {
         const response = await fetch('/api/delete_account', {
             method: 'DELETE',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ password: password })
+            body: JSON.stringify({ password: cleanPassword })
         });
 
         if (response.ok) {
@@ -337,8 +360,8 @@ async function deleteAccount() {
 
 /* --- API CALLS --- */
 async function attemptLogin() {
-    const user = document.getElementById('login-user').value;
-    const pass = document.getElementById('login-pass').value;
+    const user = document.getElementById('login-user').value.trim(); // Trim for login too
+    const pass = document.getElementById('login-pass').value.trim();
     const code = document.getElementById('login-code').value;
     const btn = document.querySelector('#login-section .btn');
     btn.innerText = "Verifying...";
