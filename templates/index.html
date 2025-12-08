@@ -47,19 +47,70 @@
             </div>
             <button class="btn btn-primary" onclick="attemptLogin()">Unlock Vault</button>
             <div id="error-msg" class="text-error"></div>
+            
+            <p class="footer" style="margin-top:20px; font-size:0.9rem;">
+                New here? <button class="link-btn" onclick="toggleRegister()">Create Account</button>
+            </p>
+        </div>
+
+        <div id="register-section" class="card hidden">
+            <h2>Create Account</h2>
+            <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem;">Set up your secure vault</p>
+            
+            <div class="input-group">
+                <label>New Username</label>
+                <input type="text" id="reg-user" autocapitalize="off" autocorrect="off">
+            </div>
+            <div class="input-group">
+                <label>New Password</label>
+                <div class="password-wrapper">
+                    <div id="reg-bubble" class="validation-bubble">Invalid character detected (space, quotes, \, ;, {}, [], |)</div>
+                    <input type="password" id="reg-pass">
+                    <button class="btn-eye" onclick="togglePassword('reg-pass', this)" type="button">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Confirm Password</label>
+                <div class="password-wrapper">
+                    <input type="password" id="reg-pass-confirm">
+                    <button class="btn-eye" onclick="togglePassword('reg-pass-confirm', this)" type="button">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="registerUser()">Create Account</button>
+            <button class="btn btn-danger" onclick="toggleRegister()" style="margin-top: 10px; color: var(--text-main);">Cancel</button>
+            <div id="reg-error" class="text-error"></div>
+        </div>
+
+        <div id="setup-2fa-section" class="card hidden">
+            <h2>Setup 2FA</h2>
+            <p style="text-align: center; color: var(--text-muted);">Scan this with Google Authenticator or Microsoft Authenticator:</p>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <img id="qr-image" src="" alt="QR Code" style="border: 4px solid white; border-radius: 8px; width: 200px; height: 200px;">
+            </div>
+
+            <p style="text-align: center; font-size: 0.85rem; color: var(--text-muted);">Or enter manually:</p>
+            <p id="secret-code-display" style="text-align: center; font-family: monospace; font-size: 1.1rem; letter-spacing: 2px; margin-bottom: 20px; font-weight: bold; color: var(--primary); user-select: text;"></p>
+
+            <button class="btn btn-primary" onclick="finishRegistration()">I have scanned it (Go to Login)</button>
         </div>
 
         <div id="vault-section" class="hidden">
             <div class="header-row">
                 <h2><span id="header-username">My</span> Passwords</h2>
                 <div class="header-actions">
-                    <button onclick="toggleSettings()" class="link-btn">Settings</button>
+                    <button onclick="toggleSettings()" class="link-btn">Account</button>
                     <button onclick="logout()" class="link-btn">Log Out</button>
                 </div>
             </div>
 
             <div id="settings-card" class="card hidden" style="border-left: 5px solid var(--primary);">
-                <h3 style="margin-top:0;">Account Settings</h3>
+                <h3 style="margin-top:0;">Account Management</h3>
                 <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom: 1rem;">Update credentials. Leave blank to keep unchanged.</p>
                 
                 <div class="input-group">
@@ -79,6 +130,11 @@
                 </div>
                 <button class="btn btn-primary" onclick="updateAccount()">Update Account</button>
                 <button class="btn btn-danger" onclick="toggleSettings()" style="margin-top: 10px; color: var(--text-main);">Cancel</button>
+
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);">
+                <div style="text-align: center;">
+                    <button onclick="deleteAccount()" style="background: none; border: 1px solid var(--danger); color: var(--danger); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Delete Account</button>
+                </div>
             </div>
 
             <div class="card" id="add-card">

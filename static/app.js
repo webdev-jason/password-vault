@@ -15,10 +15,24 @@ window.onload = async function() {
     // NEW: Expanded Validation Regex for "Banned Characters"
     const bannedChars = /[\s\\^~"'\[\]{};|]/;
 
+    // Listener for Settings Password
     const newPassInput = document.getElementById('set-new-pass');
     if (newPassInput) {
         newPassInput.addEventListener('input', function(e) {
             const bubble = document.getElementById('pass-bubble');
+            if (bannedChars.test(this.value)) {
+                bubble.classList.add('visible');
+            } else {
+                bubble.classList.remove('visible');
+            }
+        });
+    }
+
+    // Listener for Registration Password
+    const regPassInput = document.getElementById('reg-pass');
+    if (regPassInput) {
+        regPassInput.addEventListener('input', function(e) {
+            const bubble = document.getElementById('reg-bubble');
             if (bannedChars.test(this.value)) {
                 bubble.classList.add('visible');
             } else {
@@ -150,6 +164,74 @@ function showVault(masterKey) {
     resetTimer(); 
 }
 
+/* --- REGISTRATION LOGIC --- */
+function toggleRegister() {
+    const loginCard = document.getElementById('login-section');
+    const regCard = document.getElementById('register-section');
+
+    if (regCard.classList.contains('hidden')) {
+        loginCard.classList.add('hidden');
+        regCard.classList.remove('hidden');
+    } else {
+        loginCard.classList.remove('hidden');
+        regCard.classList.add('hidden');
+    }
+}
+
+async function registerUser() {
+    const user = document.getElementById('reg-user').value;
+    const pass = document.getElementById('reg-pass').value;
+    const passConfirm = document.getElementById('reg-pass-confirm').value;
+    const btn = document.querySelector('#register-section .btn-primary');
+    
+    if(!user || !pass) return alert("Username and Password required");
+    
+    // NEW: Check if passwords match
+    if(pass !== passConfirm) return alert("Passwords do not match");
+
+    const originalText = btn.innerText;
+    btn.innerText = "Creating Account...";
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username: user, password: pass })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Success: Move to 2FA Setup
+            document.getElementById('register-section').classList.add('hidden');
+            document.getElementById('setup-2fa-section').classList.remove('hidden');
+            
+            // Set QR Code and Secret
+            document.getElementById('qr-image').src = "data:image/png;base64," + result.qr_code;
+            document.getElementById('secret-code-display').innerText = result.secret;
+            
+        } else {
+            document.getElementById('reg-error').innerText = result.error;
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    } catch(e) {
+        document.getElementById('reg-error').innerText = "Server Error";
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+}
+
+function finishRegistration() {
+    document.getElementById('setup-2fa-section').classList.add('hidden');
+    document.getElementById('login-section').classList.remove('hidden');
+    // Clear inputs
+    document.getElementById('reg-user').value = "";
+    document.getElementById('reg-pass').value = "";
+    document.getElementById('reg-pass-confirm').value = "";
+}
+
 /* --- SETTINGS LOGIC --- */
 function toggleSettings() {
     const card = document.getElementById('settings-card');
@@ -215,6 +297,31 @@ async function updateAccount() {
         alert("Server Error");
         btn.innerText = originalText;
         btn.disabled = false;
+    }
+}
+
+async function deleteAccount() {
+    if (!confirm("⚠️ DANGER: This will permanently delete your account and ALL saved passwords. This cannot be undone.\n\nAre you absolutely sure?")) return;
+    
+    const password = prompt("Please enter your Password to confirm deletion:");
+    if (!password) return;
+
+    try {
+        const response = await fetch('/api/delete_account', {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ password: password })
+        });
+
+        if (response.ok) {
+            alert("Account Deleted.");
+            logout();
+        } else {
+            const result = await response.json();
+            alert("Deletion Failed: " + (result.error || "Unknown error"));
+        }
+    } catch (e) {
+        alert("Server connection error.");
     }
 }
 
@@ -301,8 +408,6 @@ async function loadPasswords(masterKey) {
         listDiv.appendChild(item);
     });
 }
-
-// --- RESTORED CRUD FUNCTIONS ---
 
 function toggleEdit(id) {
     const displayRow = document.getElementById(`display-${id}`);

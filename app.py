@@ -6,6 +6,9 @@ import crypto_manager
 import jwt 
 import datetime
 import os
+import qrcode
+import base64
+from io import BytesIO
 from functools import wraps
 from dotenv import load_dotenv
 
@@ -63,6 +66,66 @@ def index():
 @app.route('/privacy')
 def privacy():
     return render_template('privacy.html')
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    # 1. Validation
+    if not username or not password:
+        return jsonify({"error": "Username and Password required"}), 400
+        
+    banned_chars = [' ', '\t', '\n', '\r', '\\', '^', '~', '"', "'", '{', '}', '[', ']', '|', ';']
+    for char in banned_chars:
+        if char in password:
+            return jsonify({"error": "Password contains invalid characters"}), 400
+            
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        # 2. Check if exists
+        cur.execute('SELECT id FROM users WHERE username = %s', (username,))
+        if cur.fetchone():
+            return jsonify({"error": "Username already exists"}), 400
+
+        # 3. Create Credentials
+        salt = crypto_manager.generate_salt()
+        password_hash = crypto_manager.hash_master_password(password, salt)
+        two_factor_secret = pyotp.random_base32()
+
+        # 4. Save to DB
+        cur.execute('''
+            INSERT INTO users (username, password_hash, salt, two_factor_secret)
+            VALUES (%s, %s, %s, %s)
+        ''', (username, password_hash, salt.hex(), two_factor_secret))
+        conn.commit()
+
+        # 5. Generate QR Code
+        totp_uri = pyotp.totp.TOTP(two_factor_secret).provisioning_uri(name=username, issuer_name="Password Vault")
+        
+        img = qrcode.make(totp_uri)
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        qr_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+        return jsonify({
+            "message": "User created", 
+            "qr_code": qr_b64, 
+            "secret": two_factor_secret
+        }), 201
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -220,10 +283,7 @@ def update_account(current_user_id):
     new_username = data.get('new_username')
     new_password = data.get('new_password')
 
-    # SERVER SIDE VALIDATION
-    # Banned: Space, Tab, Newline, Backslash, Caret, Tilde, Quotes, Brackets, Pipe, Semicolon
     banned_chars = [' ', '\t', '\n', '\r', '\\', '^', '~', '"', "'", '{', '}', '[', ']', '|', ';']
-    
     if new_password:
         for char in banned_chars:
             if char in new_password:
@@ -269,6 +329,34 @@ def update_account(current_user_id):
         conn.commit()
         return jsonify({"message": "Account updated successfully"}), 200
 
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+# NEW: Delete Account Route
+@app.route('/api/delete_account', methods=['DELETE'])
+@token_required
+def delete_account(current_user_id):
+    data = request.json
+    password_check = data.get('password')
+    
+    # 1. Verify Password again before deleting
+    user = verify_password_logic(current_user_id, password_check)
+    if not user: return jsonify({"error": "Invalid Password"}), 401
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Delete all passwords first
+        cur.execute('DELETE FROM passwords WHERE user_id = %s', (current_user_id,))
+        # Delete the user
+        cur.execute('DELETE FROM users WHERE id = %s', (current_user_id,))
+        conn.commit()
+        return jsonify({"message": "Account deleted successfully"}), 200
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
