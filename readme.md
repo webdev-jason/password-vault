@@ -51,9 +51,15 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 ### 4. Configure Environment Variables
-Create a .env file in the root directory:
+Create a `.env` file in the root directory to store your private configuration. This keeps your secrets safe from the public code.
+
+```ini
 # .env
-SECRET_KEY=your_super_secret_flask_key
+
+# Security key for Flask session cookies (Generate a random string)
+SECRET_KEY=your_super_secret_random_string_here
+
+# Connection string for your PostgreSQL database
 DATABASE_URL=postgresql://user:password@your-neon-db-url.com/dbname
 
 ### 5. Initialize the Database
