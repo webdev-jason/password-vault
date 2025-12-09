@@ -38,7 +38,7 @@ A secure, self-hosted password manager built with **Python Flask** and **Postgre
 git clone [https://github.com/webdev-jason/password-vault.git](https://github.com/webdev-jason/password-vault.git)
 cd password-vault
 
-2. Set Up Virtual Environment
+### 2. Set Up Virtual Environment
 # Windows
 python -m venv venv
 .\venv\Scripts\activate
@@ -47,24 +47,24 @@ python -m venv venv
 python3 -m venv venv
 source venv/bin/activate
 
-3. Install Dependencies
+### 3. Install Dependencies
 pip install -r requirements.txt
 
-4. Configure Environment Variables
+### 4. Configure Environment Variables
 Create a .env file in the root directory:
 # .env
 SECRET_KEY=your_super_secret_flask_key
 DATABASE_URL=postgresql://user:password@your-neon-db-url.com/dbname
 
-5. Initialize the Database
+### 5. Initialize the Database
 python db_setup.py
 
-6. Run the Application
+### 6. Run the Application
 python app.py
 
 Visit http://127.0.0.1:5000 in your browser.
 
-📱 Mobile Installation (PWA)
+## 📱 Mobile Installation (PWA)
 Navigate to your deployed website on your mobile phone (Chrome for Android, Safari for iOS).
 
 Android: Tap the menu (3 dots) -> "Install App" or "Add to Home Screen".
@@ -73,14 +73,14 @@ iOS: Tap the "Share" button -> "Add to Home Screen".
 
 The app will appear on your home screen with the custom "PV" Shield icon.
 
-🛡️ Security Logic
+## 🛡️ Security Logic
 Encryption: User data is encrypted using a key derived from the Master Password + a unique Salt using PBKDF2-HMAC-SHA256.
 
 Re-Encryption: When a user changes their Master Password, the server decrypts all records using the old key and immediately re-encrypts them with the new key in a single atomic transaction.
 
 Validation: Inputs are sanitized on both the client-side (Regex) and server-side to prevent injection attacks and ensure data integrity.
 
-📂 Project Structure
+## 📂 Project Structure
 password-vault/
 ├── static/
 │   ├── app.js           # Frontend logic (Encryption handling, UI state)
