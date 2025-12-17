@@ -74,11 +74,13 @@ iOS: Tap the "Share" button -> "Add to Home Screen".
 The app will appear on your home screen with the custom "PV" Shield icon.
 
 ## 🛡️ Security Logic
-Encryption: User data is encrypted using a key derived from the Master Password + a unique Salt using PBKDF2-HMAC-SHA256.
+Ephemeral Encryption: The Master Password is sent to the server over HTTPS but is never stored. It is used to derive an encryption key in memory, perform the operation, and is immediately discarded.
 
-Re-Encryption: When a user changes their Master Password, the server decrypts all records using the old key and immediately re-encrypts them with the new key in a single atomic transaction.
+Database Security: User data is encrypted using Fernet (AES-128). Even the database administrator cannot read saved passwords.
 
-Validation: Inputs are sanitized on both the client-side (Regex) and server-side to prevent injection attacks and ensure data integrity.
+Input Sanitization: Inputs are sanitized on both the client-side (Regex) and server-side to prevent injection attacks and ensure data integrity.
+
+Session Security: Uses HttpOnly and SameSite=Strict cookies to prevent XSS and CSRF attacks.
 
 ## 📂 Project Structure
 password-vault/

@@ -85,7 +85,7 @@ def register():
         if char in password:
             return jsonify({"error": "Password contains invalid characters"}), 400
             
-    # NEW: Check Username for banned chars too
+    # Check Username for banned chars too
     for char in banned_chars:
         if char in username:
             return jsonify({"error": "Username contains invalid characters"}), 400
@@ -126,12 +126,13 @@ def register():
             "message": "User created", 
             "qr_code": qr_b64, 
             "secret": two_factor_secret,
-            "totp_uri": totp_uri # NEW: Send URI for "Tap to Setup" button
+            "totp_uri": totp_uri 
         }), 201
 
     except Exception as e:
         conn.rollback()
-        return jsonify({"error": str(e)}), 500
+        print(f"Register Error: {e}") # Log internally
+        return jsonify({"error": "An internal server error occurred."}), 500
     finally:
         cur.close()
         conn.close()
@@ -344,7 +345,8 @@ def update_account(current_user_id):
 
     except Exception as e:
         conn.rollback()
-        return jsonify({"error": str(e)}), 500
+        print(f"Account Update Error: {e}") # Log internally
+        return jsonify({"error": "An internal server error occurred."}), 500
     finally:
         cur.close()
         conn.close()
@@ -372,7 +374,8 @@ def delete_account(current_user_id):
         return jsonify({"message": "Account deleted successfully"}), 200
     except Exception as e:
         conn.rollback()
-        return jsonify({"error": str(e)}), 500
+        print(f"Delete Account Error: {e}") # Log internally
+        return jsonify({"error": "An internal server error occurred."}), 500
     finally:
         cur.close()
         conn.close()
