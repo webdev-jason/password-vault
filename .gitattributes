@@ -1,0 +1,9 @@
+# Handle line endings
+* text=auto
+
+# Ensure Python is the primary language
+*.py linguist-language=Python
+
+# Mark static assets as vendored/documentation so they don't skew the language bar
+static/* linguist-vendored
+templates/* linguist-language=HTML
