@@ -8,8 +8,7 @@
 
 A secure, self-hosted password manager built with Python Flask and PostgreSQL. It features Zero-Knowledge Encryption, Two-Factor Authentication (2FA), and a fully responsive Progressive Web App (PWA) interface for mobile access.
 
-## 🛡️ Security First
-<img src="static/readme_icon.png" width="250" alt="Password Vault Shield Logo">
+<img src="static/readme_icon.png" width="250" alt="Password Vault Logo">
 
 ## ✨ Features
 * **🔒 Zero-Knowledge Architecture**: Master passwords are never stored. Encryption keys are derived client-side; only encrypted data reaches the server.
